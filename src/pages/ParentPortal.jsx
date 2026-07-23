@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import OTPInput from '../components/OTPInput.jsx';
-import MarketplaceBanner from '../components/MarketplaceBanner.jsx';
 import api, { requestParentOtp, verifyParentOtp, getParentDashboard } from '../utils/api.js';
 
 export default function ParentPortal() {
@@ -194,7 +193,6 @@ export default function ParentPortal() {
         <div className="mt-6 text-center">
           <a href="#/teacher/login" className="text-sm" style={{ color: 'rgba(255,255,255,0.8)' }}>Teacher Login →</a>
         </div>
-        <MarketplaceBanner />
       </div>
     </div>
   );
