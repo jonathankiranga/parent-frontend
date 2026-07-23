@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ParentPortal from './pages/ParentPortal.jsx';
+import MerchantPortal from './pages/MerchantPortal.jsx';
 import HelpPage from './pages/HelpPage.jsx';
 import InstallPrompt from './components/InstallPrompt.jsx';
 
@@ -11,6 +12,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/parent" replace />} />
         <Route path="/parent" element={<ParentPortal />} />
+        <Route path="/merchant" element={<MerchantPortal />} />
         <Route path="/help" element={<HelpPage />} />
       </Routes>
     </>

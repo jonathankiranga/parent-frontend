@@ -41,4 +41,19 @@ export async function getPremiumStatus(phone) {
   return data;
 }
 
+export async function registerMerchant(body) {
+  const { data } = await api.post('/api/merchants/register', body);
+  return data;
+}
+
+export async function requestMerchantOtp(phone) {
+  const { data } = await api.post('/api/merchants/request-otp', { phone });
+  return data;
+}
+
+export async function verifyMerchantOtp(session_id, code) {
+  const { data } = await api.post('/api/merchants/verify-otp', { session_id, code });
+  return data;
+}
+
 export default api;
