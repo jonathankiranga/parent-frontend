@@ -21,6 +21,16 @@ export async function getParentDashboard(phone) {
   return data;
 }
 
+export async function getAd(schoolId) {
+  const { data } = await api.get('/api/ads/active', { params: { school_id: schoolId } });
+  return data;
+}
+
+export async function getRandomAd() {
+  const { data } = await api.get('/api/ads/random');
+  return data;
+}
+
 export async function upgradePremium(phone) {
   const { data } = await api.post('/api/parents/upgrade', { phone });
   return data;
