@@ -1,7 +1,6 @@
-/// <reference lib="webworker" />
-importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.5.4/workbox-sw.js');
+import { precacheAndRoute } from 'workbox-precaching';
 
-self.__WB_MANIFEST;
+precacheAndRoute(self.__WB_MANIFEST);
 
 const SW = self;
 
@@ -22,5 +21,3 @@ SW.addEventListener('notificationclick', event => {
   const url = event.notification.data?.url || '/';
   event.waitUntil(clients.openWindow(url));
 });
-
-self.__WB_DISABLE_DEV_LOGS = true;
