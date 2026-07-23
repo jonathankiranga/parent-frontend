@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply m-0 font-sans antialiased;
+    background-color: #F8F8F8;
+    -webkit-tap-highlight-color: transparent;
+    color: #333;
+  }
+
+  input, button, select, textarea {
+    font-size: 16px;
+  }
+
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: rgba(123, 79, 155, 0.15);
+    color: #7B4F9B;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply w-full py-3.5 rounded-lg font-semibold text-base text-white transition-all duration-150;
+    background-color: #7B4F9B;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background-color: #6A4286;
+  }
+
+  .btn-primary:active:not(:disabled) {
+    background-color: #5C3D76;
+  }
+
+  .btn-primary:disabled {
+    @apply opacity-40;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150;
+    color: #7B4F9B;
+    background-color: rgba(123, 79, 155, 0.08);
+  }
+
+  .btn-secondary:hover {
+    background-color: rgba(123, 79, 155, 0.15);
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 rounded-lg border text-base transition-all duration-150 outline-none;
+    border-color: #E0E0E0;
+    background-color: #FFFFFF;
+    color: #333;
+  }
+
+  .input-field:focus {
+    border-color: #7B4F9B;
+    box-shadow: 0 0 0 3px rgba(123, 79, 155, 0.1);
+  }
+
+  .input-field::placeholder {
+    color: #B0B0B0;
+  }
+
+  .card {
+    @apply rounded-card bg-white transition-all duration-150;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    border: 1px solid #F0F0F0;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium;
+  }
+
+  .badge-present {
+    @apply badge;
+    background-color: #E8F5E9;
+    color: #2E7D32;
+  }
+
+  .badge-absent {
+    @apply badge;
+    background-color: #FFEBEE;
+    color: #C62828;
+  }
+
+  .badge-premium {
+    @apply badge;
+    background-color: rgba(123, 79, 155, 0.1);
+    color: #7B4F9B;
+  }
+
+  .navbar {
+    @apply bg-white sticky top-0 z-50;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.08);
+  }
+}
