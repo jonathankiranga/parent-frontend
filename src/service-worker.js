@@ -1,4 +1,8 @@
 /// <reference lib="webworker" />
+importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.5.4/workbox-sw.js');
+
+self.__WB_MANIFEST;
+
 const SW = self;
 
 SW.addEventListener('push', event => {
@@ -19,5 +23,4 @@ SW.addEventListener('notificationclick', event => {
   event.waitUntil(clients.openWindow(url));
 });
 
-// Default workbox-based caching — injected by vite-plugin-pwa
 self.__WB_DISABLE_DEV_LOGS = true;
