@@ -41,6 +41,16 @@ export async function getPremiumStatus(phone) {
   return data;
 }
 
+export async function getAcademicReport(studentId, term) {
+  const { data } = await api.get(`/api/assessments/report/${encodeURIComponent(studentId)}/${encodeURIComponent(term)}`);
+  return data;
+}
+
+export async function getFeeStatement(studentId, term, year) {
+  const { data } = await api.get(`/api/fees/statement/${encodeURIComponent(studentId)}/${encodeURIComponent(term)}/${encodeURIComponent(year)}`);
+  return data;
+}
+
 export async function registerMerchant(body) {
   const { data } = await api.post('/api/merchants/register', body);
   return data;
