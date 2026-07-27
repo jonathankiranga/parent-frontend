@@ -66,4 +66,9 @@ export async function verifyMerchantOtp(session_id, code) {
   return data;
 }
 
+export async function getAcademicRecords(phone) {
+  const { data } = await api.get(`/api/parents/academic-records/${encodeURIComponent(phone)}`);
+  return data;
+}
+
 export default api;

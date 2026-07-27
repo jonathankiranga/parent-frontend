@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import OTPInput from '../components/OTPInput.jsx';
 import MarketplaceBanner from '../components/MarketplaceBanner.jsx';
-import api, { requestParentOtp, verifyParentOtp, getParentDashboard, getAcademicReport, getFeeStatement, getPremiumStatus } from '../utils/api.js';
+import api, { requestParentOtp, verifyParentOtp, getParentDashboard, getAcademicReport, getFeeStatement, getPremiumStatus, getAcademicRecords } from '../utils/api.js';
 
 export default function ParentPortal() {
   const [phone, setPhone] = useState('');
@@ -23,6 +23,10 @@ export default function ParentPortal() {
   const [premiumTotal, setPremiumTotal] = useState(100);
   const [premiumCount, setPremiumCount] = useState(1);
   const [renewalPhone, setRenewalPhone] = useState('');
+  const [academicRecords, setAcademicRecords] = useState([]);
+  const [recordsLoading, setRecordsLoading] = useState(false);
+  const [expandedChild, setExpandedChild] = useState(null);
+  const [expandedArchiveYear, setExpandedArchiveYear] = useState(null);
 
   async function handleRequestOtp(e) {
     e.preventDefault();
@@ -76,6 +80,15 @@ export default function ParentPortal() {
       setPremiumCount(data.premium_children_count || (data.children?.length || 1));
       setRenewalPhone(phone);
       setStep('dashboard');
+      // Fetch academic records (free — no premium check)
+      setRecordsLoading(true);
+      try {
+        const records = await getAcademicRecords(phone);
+        setAcademicRecords(records);
+      } catch (e) {
+        console.error('[Records] Failed to fetch:', e.message);
+      }
+      setRecordsLoading(false);
     } catch (err) {
       setError(err.response?.data?.error || 'Invalid code');
     }
@@ -105,8 +118,7 @@ export default function ParentPortal() {
         setIsPremium(true);
         setRenewalRequired(false);
         setPremiumTotal(r.data.premium_due || premiumTotal);
-        const expires = new Date();
-        expires.setMonth(expires.getMonth() + 4);
+        const expires = new Date(Date.now() + 120 * 86400000);
         setPremiumExpires(expires.toISOString());
       }
     } catch (err) {
@@ -262,6 +274,112 @@ export default function ParentPortal() {
               </div>
             ))}
           </div>
+
+          {/* Academic Records — premium only */}
+          {isPremium && !renewalRequired && (<div className="mt-6">
+            <h2 className="text-lg font-bold mb-3" style={{ color: '#333' }}>Academic Records</h2>
+            {recordsLoading ? (
+              <p className="text-sm" style={{ color: '#888' }}>Loading records...</p>
+            ) : academicRecords.length === 0 ? (
+              <p className="text-sm" style={{ color: '#888' }}>No academic records found.</p>
+            ) : (
+              academicRecords.map((rec, i) => (
+                <div key={i} className="card p-4 mb-3">
+                  <div
+                    className="flex items-center justify-between cursor-pointer"
+                    onClick={() => setExpandedChild(expandedChild === rec.student_id ? null : rec.student_id)}
+                  >
+                    <div>
+                      <h3 className="font-semibold" style={{ color: '#333' }}>{rec.full_name}</h3>
+                      <p className="text-xs" style={{ color: '#888' }}>{rec.class_name}</p>
+                    </div>
+                    <span style={{ color: '#bbb', fontSize: 18 }}>{expandedChild === rec.student_id ? '▲' : '▼'}</span>
+                  </div>
+
+                  {expandedChild === rec.student_id && (
+                    <div className="mt-3 pt-3 border-t" style={{ borderColor: '#F0F0F0' }}>
+                      {/* Current Term */}
+                      <p className="text-sm font-semibold mb-2" style={{ color: '#7B4F9B' }}>
+                        Current Term — {rec.current.term} ({rec.current.year})
+                      </p>
+                      {rec.current.areas.length === 0 ? (
+                        <p className="text-xs" style={{ color: '#888' }}>No results posted yet for this term.</p>
+                      ) : (
+                        <table className="w-full text-xs mb-4" style={{ borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ borderBottom: '2px solid #F0F0F0' }}>
+                              <th className="text-left py-1.5 pr-2" style={{ color: '#666' }}>Learning Area</th>
+                              <th className="text-right px-2 py-1.5" style={{ color: '#666' }}>Score (%)</th>
+                              <th className="text-right pl-2 py-1.5" style={{ color: '#666' }}>Level</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rec.current.areas.map((area, j) => (
+                              <tr key={j} style={{ borderBottom: '1px solid #F5F5F5' }}>
+                                <td className="py-1.5 pr-2" style={{ color: '#333' }}>{area.area_name}</td>
+                                <td className="text-right px-2 py-1.5" style={{ color: '#333' }}>{area.avg_pct}</td>
+                                <td className="text-right pl-2 py-1.5">
+                                  <span style={{ color: area.color, fontWeight: 600 }}>{area.level}</span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+
+                      {/* Archive — premium only */}
+                      {isPremium && !renewalRequired && rec.archive.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-sm font-semibold mb-2" style={{ color: '#555' }}>Previous Academic Years</p>
+                          {rec.archive.map((yr, j) => (
+                            <div key={j} className="mb-2">
+                              <div
+                                className="flex items-center justify-between cursor-pointer py-1.5"
+                                onClick={() => setExpandedArchiveYear(expandedArchiveYear === `${rec.student_id}-${yr.year}` ? null : `${rec.student_id}-${yr.year}`)}
+                              >
+                                <p className="text-sm font-medium" style={{ color: '#333' }}>{yr.year}</p>
+                                <span style={{ color: '#bbb', fontSize: 14 }}>{expandedArchiveYear === `${rec.student_id}-${yr.year}` ? '▲' : '▼'}</span>
+                              </div>
+                              {expandedArchiveYear === `${rec.student_id}-${yr.year}` && yr.terms.map((t, k) => (
+                                <div key={k} className="ml-3 mb-2">
+                                  <p className="text-xs font-semibold mb-1" style={{ color: '#7B4F9B' }}>{t.term}</p>
+                                  {t.areas.length === 0 ? (
+                                    <p className="text-xs" style={{ color: '#888' }}>No records.</p>
+                                  ) : (
+                                    <table className="w-full text-xs" style={{ borderCollapse: 'collapse' }}>
+                                      <thead>
+                                        <tr style={{ borderBottom: '2px solid #F0F0F0' }}>
+                                          <th className="text-left py-1 pr-2" style={{ color: '#666' }}>Area</th>
+                                          <th className="text-right px-2 py-1" style={{ color: '#666' }}>Score</th>
+                                          <th className="text-right pl-2 py-1" style={{ color: '#666' }}>Level</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {t.areas.map((area, l) => (
+                                          <tr key={l} style={{ borderBottom: '1px solid #F5F5F5' }}>
+                                            <td className="py-1 pr-2" style={{ color: '#333' }}>{area.area_name}</td>
+                                            <td className="text-right px-2 py-1" style={{ color: '#333' }}>{area.avg_pct}</td>
+                                            <td className="text-right pl-2 py-1">
+                                              <span style={{ color: area.color, fontWeight: 600 }}>{area.level}</span>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+          )}
         </div>
       </div>
     );
