@@ -41,8 +41,10 @@ export async function getPremiumStatus(phone) {
   return data;
 }
 
-export async function getAcademicReport(studentId, term) {
-  const { data } = await api.get(`/api/assessments/report/${encodeURIComponent(studentId)}/${encodeURIComponent(term)}`);
+export async function getAcademicReport(studentId, term, year) {
+  const { data } = await api.get(`/api/assessments/report/${encodeURIComponent(studentId)}/${encodeURIComponent(term)}`, {
+    params: { year }
+  });
   return data;
 }
 
@@ -68,6 +70,13 @@ export async function verifyMerchantOtp(session_id, code) {
 
 export async function getAcademicRecords(phone) {
   const { data } = await api.get(`/api/parents/academic-records/${encodeURIComponent(phone)}`);
+  return data;
+}
+
+export async function getPaymentStatus(checkoutRequestId, phone) {
+  const { data } = await api.get('/api/parents/payment-status', {
+    params: { checkout_request_id: checkoutRequestId, phone }
+  });
   return data;
 }
 

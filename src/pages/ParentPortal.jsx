@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import OTPInput from '../components/OTPInput.jsx';
 import MarketplaceBanner from '../components/MarketplaceBanner.jsx';
-import api, { requestParentOtp, verifyParentOtp, getParentDashboard, getAcademicReport, getFeeStatement, getPremiumStatus, getAcademicRecords } from '../utils/api.js';
+import api, { requestParentOtp, verifyParentOtp, getParentDashboard, getAcademicReport, getFeeStatement, getPremiumStatus } from '../utils/api.js';
 
 export default function ParentPortal() {
   const [phone, setPhone] = useState('');
@@ -16,6 +16,7 @@ export default function ParentPortal() {
   const [premiumExpires, setPremiumExpires] = useState(null);
   const [upgrading, setUpgrading] = useState(false);
   const [upgradeMsg, setUpgradeMsg] = useState('');
+  const [checkoutRequestId, setCheckoutRequestId] = useState(null);
   const [sendingReminder, setSendingReminder] = useState(false);
   const [reminderMsg, setReminderMsg] = useState('');
   const [exporting, setExporting] = useState(false);
@@ -23,10 +24,38 @@ export default function ParentPortal() {
   const [premiumTotal, setPremiumTotal] = useState(100);
   const [premiumCount, setPremiumCount] = useState(1);
   const [renewalPhone, setRenewalPhone] = useState('');
-  const [academicRecords, setAcademicRecords] = useState([]);
-  const [recordsLoading, setRecordsLoading] = useState(false);
-  const [expandedChild, setExpandedChild] = useState(null);
-  const [expandedArchiveYear, setExpandedArchiveYear] = useState(null);
+
+  // Term selection — derive current term from month, one selector shared across all children
+  function deriveCurrentTerm() {
+    const m = new Date().getMonth() + 1; // 1–12
+    if (m <= 4) return 'Term 1';
+    if (m <= 8) return 'Term 2';
+    return 'Term 3';
+  }
+  const [selectedTerm, setSelectedTerm] = useState(deriveCurrentTerm);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+  // Restore session on page load/refresh
+  useEffect(() => {
+    const saved = sessionStorage.getItem('parent_phone');
+    if (!saved) return;
+    setPhone(saved);
+    getParentDashboard(saved).then(data => {
+      setDashboard(data.children || []);
+      setSchoolId(data.school_id);
+      setIsPremium(Boolean(data.premium_active));
+      setRenewalRequired(Boolean(data.renewal_required));
+      setPremiumExpires(data.parent?.premium_expires_at || null);
+      setPremiumPrice(data.premium_price || 100);
+      setPremiumTotal(data.premium_total || 100);
+      setPremiumCount(data.premium_children_count || (data.children?.length || 1));
+      setRenewalPhone(saved);
+      setStep('dashboard');
+    }).catch(() => {
+      // Session stale or server error — clear and show login
+      sessionStorage.removeItem('parent_phone');
+    });
+  }, []);
 
   async function handleRequestOtp(e) {
     e.preventDefault();
@@ -48,8 +77,12 @@ export default function ParentPortal() {
       }
 
       if (status.renewal_required) {
-        // Show locked UI instead of sending OTP
+        // Show pay wall but still allow them to proceed to OTP so they can pay from dashboard
         setRenewalRequired(true);
+        // Still send OTP so they can log in and pay from within the dashboard
+        const data = await requestParentOtp(phone);
+        setSessionId(data.session_id);
+        setStep('otp');
         setLoading(false);
         return;
       }
@@ -79,16 +112,8 @@ export default function ParentPortal() {
       setPremiumTotal(data.premium_total || 100);
       setPremiumCount(data.premium_children_count || (data.children?.length || 1));
       setRenewalPhone(phone);
+      sessionStorage.setItem('parent_phone', phone); // persist across page refreshes
       setStep('dashboard');
-      // Fetch academic records (free — no premium check)
-      setRecordsLoading(true);
-      try {
-        const records = await getAcademicRecords(phone);
-        setAcademicRecords(records);
-      } catch (e) {
-        console.error('[Records] Failed to fetch:', e.message);
-      }
-      setRecordsLoading(false);
     } catch (err) {
       setError(err.response?.data?.error || 'Invalid code');
     }
@@ -107,33 +132,86 @@ export default function ParentPortal() {
     setSendingReminder(false);
   }
 
+  // Poll for payment confirmation after STK push
+  useEffect(() => {
+    if (!checkoutRequestId) return;
+    let attempts = 0;
+    const maxAttempts = 24; // 2 minutes at 5s intervals
+    const timer = setInterval(async () => {
+      attempts++;
+      try {
+        const r = await api.get('/api/parents/payment-status', {
+          params: { checkout_request_id: checkoutRequestId, phone }
+        });
+        if (r.data.status === 'completed') {
+          clearInterval(timer);
+          setCheckoutRequestId(null);
+          setIsPremium(true);
+          setRenewalRequired(false);
+          setUpgrading(false);
+          setUpgradeMsg('✓ Payment confirmed — premium activated!');
+          // Refresh dashboard to get updated children
+          getParentDashboard(phone).then(data => {
+            setDashboard(data.children || []);
+            setPremiumExpires(data.parent?.premium_expires_at || null);
+          }).catch(() => {});
+        } else if (r.data.status === 'failed') {
+          clearInterval(timer);
+          setCheckoutRequestId(null);
+          setUpgrading(false);
+          setUpgradeMsg('Payment was cancelled or failed. Try again.');
+        }
+      } catch (e) { /* ignore poll errors */ }
+
+      if (attempts >= maxAttempts) {
+        clearInterval(timer);
+        setCheckoutRequestId(null);
+        setUpgrading(false);
+        setUpgradeMsg('Payment timed out. If you paid, it will activate shortly.');
+      }
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [checkoutRequestId, phone]);
+
   async function handleUpgrade() {
     setUpgrading(true);
     setUpgradeMsg('');
     try {
       const targetPhone = (renewalPhone || phone).trim();
       const r = await api.post('/api/parents/upgrade', { phone: targetPhone });
-      setUpgradeMsg(r.data.message || 'Processing...');
       if (r.data.status === 'confirmed') {
+        // Simulated / dev mode — immediate
         setIsPremium(true);
         setRenewalRequired(false);
         setPremiumTotal(r.data.premium_due || premiumTotal);
-        const expires = new Date(Date.now() + 120 * 86400000);
+        const expires = new Date();
+        expires.setMonth(expires.getMonth() + 4);
         setPremiumExpires(expires.toISOString());
+        setUpgradeMsg('✓ Premium activated');
+        setUpgrading(false);
+      } else if (r.data.status === 'school_paid') {
+        setIsPremium(true);
+        setRenewalRequired(false);
+        setUpgradeMsg(r.data.message);
+        setUpgrading(false);
+      } else if (r.data.status === 'pending') {
+        // STK push sent — start polling for confirmation
+        setUpgradeMsg('STK push sent — enter your M-Pesa PIN to confirm payment...');
+        setCheckoutRequestId(r.data.checkout_request_id);
+        // keep upgrading=true and spinner showing until poll resolves
       }
     } catch (err) {
       setUpgradeMsg(err.response?.data?.error || 'Upgrade failed');
+      setUpgrading(false);
     }
-    setUpgrading(false);
   }
 
   async function handleDownloadAcademic(child) {
     setExporting(true);
     try {
-      const term = 'Term 1';
-      const report = await getAcademicReport(child.student_id, term);
+      const report = await getAcademicReport(child.student_id, selectedTerm, selectedYear);
       const module = await import('../utils/pdfExport.js');
-      await module.downloadAcademicPdf(report, child.full_name, phone, term);
+      await module.downloadAcademicPdf(report, child.full_name, phone, selectedTerm);
     } catch (err) {
       setReminderMsg(err.response?.data?.error || 'Failed to generate academic report');
     }
@@ -143,11 +221,9 @@ export default function ParentPortal() {
   async function handleDownloadFees(child) {
     setExporting(true);
     try {
-      const term = 'Term 1';
-      const year = new Date().getFullYear().toString();
-      const statement = await getFeeStatement(child.student_id, term, year);
+      const statement = await getFeeStatement(child.student_id, selectedTerm, selectedYear.toString());
       const module = await import('../utils/pdfExport.js');
-      await module.downloadFeePdf(statement, child.full_name, phone, term, year);
+      await module.downloadFeePdf(statement, child.full_name, phone, selectedTerm, selectedYear.toString());
     } catch (err) {
       setReminderMsg(err.response?.data?.error || 'Failed to generate fee statement');
     }
@@ -175,7 +251,35 @@ export default function ParentPortal() {
               <h1 className="text-xl font-bold" style={{ color: '#333' }}>My Children</h1>
               <p className="text-xs mt-0.5" style={{ color: '#888' }}>{phone}</p>
             </div>
-            <button onClick={() => { setStep('phone'); setPhone(''); setDashboard(null); }} className="btn-secondary text-xs">Logout</button>
+            <button onClick={() => { sessionStorage.removeItem('parent_phone'); setStep('phone'); setPhone(''); setDashboard(null); }} className="btn-secondary text-xs">Logout</button>
+          </div>
+
+          {/* Term / Year selector — applies to all PDF downloads */}
+          <div className="flex gap-2 mb-4">
+            <div className="flex-1">
+              <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>Term</label>
+              <select
+                value={selectedTerm}
+                onChange={e => setSelectedTerm(e.target.value)}
+                className="input-field text-sm"
+              >
+                <option>Term 1</option>
+                <option>Term 2</option>
+                <option>Term 3</option>
+              </select>
+            </div>
+            <div style={{ width: 100 }}>
+              <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>Year</label>
+              <select
+                value={selectedYear}
+                onChange={e => setSelectedYear(Number(e.target.value))}
+                className="input-field text-sm"
+              >
+                {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Premium Banner */}
@@ -268,118 +372,16 @@ export default function ParentPortal() {
                   {child.last_date && <span className="text-xs" style={{ color: '#bbb' }}>{child.last_date}</span>}
                 </div>
                 <div className="flex gap-2 mt-3">
-                  <button onClick={() => handleDownloadAcademic(child)} disabled={exporting} className="btn-secondary text-xs">Download Report PDF</button>
-                  <button onClick={() => handleDownloadFees(child)} disabled={exporting} className="btn-secondary text-xs">Download Fees PDF</button>
+                  <button onClick={() => handleDownloadAcademic(child)} disabled={exporting} className="btn-secondary text-xs">
+                    Report PDF ({selectedTerm})
+                  </button>
+                  <button onClick={() => handleDownloadFees(child)} disabled={exporting} className="btn-secondary text-xs">
+                    Fees PDF ({selectedTerm})
+                  </button>
                 </div>
               </div>
             ))}
           </div>
-
-          {/* Academic Records — premium only */}
-          {isPremium && !renewalRequired && (<div className="mt-6">
-            <h2 className="text-lg font-bold mb-3" style={{ color: '#333' }}>Academic Records</h2>
-            {recordsLoading ? (
-              <p className="text-sm" style={{ color: '#888' }}>Loading records...</p>
-            ) : academicRecords.length === 0 ? (
-              <p className="text-sm" style={{ color: '#888' }}>No academic records found.</p>
-            ) : (
-              academicRecords.map((rec, i) => (
-                <div key={i} className="card p-4 mb-3">
-                  <div
-                    className="flex items-center justify-between cursor-pointer"
-                    onClick={() => setExpandedChild(expandedChild === rec.student_id ? null : rec.student_id)}
-                  >
-                    <div>
-                      <h3 className="font-semibold" style={{ color: '#333' }}>{rec.full_name}</h3>
-                      <p className="text-xs" style={{ color: '#888' }}>{rec.class_name}</p>
-                    </div>
-                    <span style={{ color: '#bbb', fontSize: 18 }}>{expandedChild === rec.student_id ? '▲' : '▼'}</span>
-                  </div>
-
-                  {expandedChild === rec.student_id && (
-                    <div className="mt-3 pt-3 border-t" style={{ borderColor: '#F0F0F0' }}>
-                      {/* Current Term */}
-                      <p className="text-sm font-semibold mb-2" style={{ color: '#7B4F9B' }}>
-                        Current Term — {rec.current.term} ({rec.current.year})
-                      </p>
-                      {rec.current.areas.length === 0 ? (
-                        <p className="text-xs" style={{ color: '#888' }}>No results posted yet for this term.</p>
-                      ) : (
-                        <table className="w-full text-xs mb-4" style={{ borderCollapse: 'collapse' }}>
-                          <thead>
-                            <tr style={{ borderBottom: '2px solid #F0F0F0' }}>
-                              <th className="text-left py-1.5 pr-2" style={{ color: '#666' }}>Learning Area</th>
-                              <th className="text-right px-2 py-1.5" style={{ color: '#666' }}>Score (%)</th>
-                              <th className="text-right pl-2 py-1.5" style={{ color: '#666' }}>Level</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {rec.current.areas.map((area, j) => (
-                              <tr key={j} style={{ borderBottom: '1px solid #F5F5F5' }}>
-                                <td className="py-1.5 pr-2" style={{ color: '#333' }}>{area.area_name}</td>
-                                <td className="text-right px-2 py-1.5" style={{ color: '#333' }}>{area.avg_pct}</td>
-                                <td className="text-right pl-2 py-1.5">
-                                  <span style={{ color: area.color, fontWeight: 600 }}>{area.level}</span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-
-                      {/* Archive — premium only */}
-                      {isPremium && !renewalRequired && rec.archive.length > 0 && (
-                        <div className="mt-3">
-                          <p className="text-sm font-semibold mb-2" style={{ color: '#555' }}>Previous Academic Years</p>
-                          {rec.archive.map((yr, j) => (
-                            <div key={j} className="mb-2">
-                              <div
-                                className="flex items-center justify-between cursor-pointer py-1.5"
-                                onClick={() => setExpandedArchiveYear(expandedArchiveYear === `${rec.student_id}-${yr.year}` ? null : `${rec.student_id}-${yr.year}`)}
-                              >
-                                <p className="text-sm font-medium" style={{ color: '#333' }}>{yr.year}</p>
-                                <span style={{ color: '#bbb', fontSize: 14 }}>{expandedArchiveYear === `${rec.student_id}-${yr.year}` ? '▲' : '▼'}</span>
-                              </div>
-                              {expandedArchiveYear === `${rec.student_id}-${yr.year}` && yr.terms.map((t, k) => (
-                                <div key={k} className="ml-3 mb-2">
-                                  <p className="text-xs font-semibold mb-1" style={{ color: '#7B4F9B' }}>{t.term}</p>
-                                  {t.areas.length === 0 ? (
-                                    <p className="text-xs" style={{ color: '#888' }}>No records.</p>
-                                  ) : (
-                                    <table className="w-full text-xs" style={{ borderCollapse: 'collapse' }}>
-                                      <thead>
-                                        <tr style={{ borderBottom: '2px solid #F0F0F0' }}>
-                                          <th className="text-left py-1 pr-2" style={{ color: '#666' }}>Area</th>
-                                          <th className="text-right px-2 py-1" style={{ color: '#666' }}>Score</th>
-                                          <th className="text-right pl-2 py-1" style={{ color: '#666' }}>Level</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {t.areas.map((area, l) => (
-                                          <tr key={l} style={{ borderBottom: '1px solid #F5F5F5' }}>
-                                            <td className="py-1 pr-2" style={{ color: '#333' }}>{area.area_name}</td>
-                                            <td className="text-right px-2 py-1" style={{ color: '#333' }}>{area.avg_pct}</td>
-                                            <td className="text-right pl-2 py-1">
-                                              <span style={{ color: area.color, fontWeight: 600 }}>{area.level}</span>
-                                            </td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-          )}
         </div>
       </div>
     );
