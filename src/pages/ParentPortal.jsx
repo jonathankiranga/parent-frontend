@@ -366,11 +366,47 @@ export default function ParentPortal() {
                   <h3 className="font-semibold" style={{ color: '#333' }}>{child.full_name}</h3>
                   <span className="badge-present">{child.class_name}</span>
                 </div>
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t" style={{ borderColor: '#F0F0F0' }}>
-                  <span className="text-xs" style={{ color: '#888' }}>Last attendance:</span>
-                  <span className={child.last_attendance === 'Present' ? 'badge-present' : 'badge-absent'}>{child.last_attendance || 'N/A'}</span>
-                  {child.last_date && <span className="text-xs" style={{ color: '#bbb' }}>{child.last_date}</span>}
+
+                {/* Attendance / Arrival */}
+                <div className="mt-3 pt-3 border-t" style={{ borderColor: '#F0F0F0' }}>
+                  <p className="text-xs font-medium mb-1" style={{ color: '#888' }}>Today's Attendance</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={child.last_attendance === 'Present' ? 'badge-present' : 'badge-absent'}>
+                      {child.last_attendance || 'Not recorded'}
+                    </span>
+                    {child.last_date && (
+                      <span className="text-xs" style={{ color: '#bbb' }}>
+                        {new Date(child.last_date).toLocaleDateString('en-KE', { weekday: 'short', day: 'numeric', month: 'short' })}
+                      </span>
+                    )}
+                    {child.arrival_time && child.last_attendance === 'Present' && (
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#E8F5E9', color: '#2E7D32' }}>
+                        🕐 Arrived {new Date(child.arrival_time).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {/* Last Fee Payment */}
+                <div className="mt-3 pt-3 border-t" style={{ borderColor: '#F0F0F0' }}>
+                  <p className="text-xs font-medium mb-1" style={{ color: '#888' }}>Last Fee Payment</p>
+                  {child.last_payment_amount ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-bold" style={{ color: '#1565C0' }}>
+                        KSh {parseFloat(child.last_payment_amount).toLocaleString()}
+                      </span>
+                      <span className="text-xs" style={{ color: '#bbb' }}>
+                        {new Date(child.last_payment_date).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {' '}at{' '}
+                        {new Date(child.last_payment_date).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-xs" style={{ color: '#bbb' }}>No payments recorded</span>
+                  )}
+                </div>
+
+                {/* PDF Downloads */}
                 <div className="flex gap-2 mt-3">
                   <button onClick={() => handleDownloadAcademic(child)} disabled={exporting} className="btn-secondary text-xs">
                     Report PDF ({selectedTerm})
