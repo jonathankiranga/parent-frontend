@@ -88,16 +88,15 @@ export default function ParentPortal() {
     setLoading(true);
     setError('');
     try {
-      const status = await getPremiumStatus(phone);
-      setPremiumPrice(status.premium_price || 100);
-      setPremiumTotal(status.premium_total || 100);
-      setPremiumCount(status.premium_children_count || 1);
+      // Get pricing info but don't block on registration status —
+      // unregistered parents can still log in and prepay
+      try {
+        const status = await getPremiumStatus(phone);
+        setPremiumPrice(status.premium_price || 100);
+        setPremiumTotal(status.premium_total || status.premium_price || 100);
+        setPremiumCount(status.premium_children_count || 1);
+      } catch { /* non-blocking — use defaults */ }
       setRenewalPhone(phone);
-      if (status.registered === false) {
-        setError('This phone is not registered. Please contact your school to be linked.');
-        setLoading(false);
-        return;
-      }
       const data = await requestParentOtp(phone);
       setSessionId(data.session_id);
       if (status.renewal_required) setRenewalRequired(true);
@@ -114,15 +113,19 @@ export default function ParentPortal() {
     try {
       await verifyParentOtp(sessionId, code);
       sessionStorage.setItem('parent_phone', phone);
+
       const schoolData = await getParentSchools(phone);
       const schools = schoolData.schools || [];
+
       if (schools.length === 0) {
-        setError('No children linked to this account. Contact your school.');
-        setLoading(false);
-        return;
-      }
-      if (schools.length === 1) {
+        // No children linked yet — show prepay screen directly
+        setDashboard([]);
+        setIsPremium(false);
+        setRenewalRequired(true);
+        setStep('dashboard');
+      } else if (schools.length === 1) {
         const sId = schools[0].school_id;
+        setMySchools(schools);
         setSelectedSchoolId(sId);
         sessionStorage.setItem('parent_school_id', sId);
         await loadDashboard(phone, sId);
@@ -299,53 +302,67 @@ export default function ParentPortal() {
             </div>
           </div>
 
-          {!isPremium ? (
-            <div className="card p-4 mb-4" style={{ borderLeft: '4px solid #FFB300' }}>
-              <div className="flex items-center justify-between mb-3">
+          {isPremium && (
+            <div className="card p-3 mb-4 flex items-center justify-between" style={{ borderLeft: '4px solid #10B981' }}>
+              <div className="flex items-center gap-2">
+                <span>✓</span>
                 <div>
-                  <p className="text-sm font-semibold" style={{ color: '#333' }}>Renew Premium for This Term</p>
-                  <p className="text-xs mt-0.5" style={{ color: '#888' }}>KSh {premiumTotal} for {premiumCount} child{premiumCount === 1 ? '' : 'ren'}</p>
+                  <p className="text-sm font-semibold" style={{ color: '#2E7D32' }}>Active</p>
+                  {premiumExpires && <p className="text-xs" style={{ color: '#888' }}>Expires {new Date(premiumExpires).toLocaleDateString()}</p>}
                 </div>
-                <button onClick={handleUpgrade} disabled={upgrading} className="btn-primary text-sm" style={{ padding: '8px 16px', fontSize: 13 }}>
-                  {upgrading ? 'Processing...' : `Pay KSh ${premiumTotal}`}
-                </button>
               </div>
-              <label className="block text-xs font-medium mb-1.5" style={{ color: '#555' }}>M-Pesa number</label>
-              <input type="tel" value={renewalPhone} onChange={e => setRenewalPhone(e.target.value)} className="input-field mb-3" placeholder="2547XXXXXXXX" />
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {['Daily absence alerts','3+ day warnings','Assessment results','Fee reminders','School broadcasts','All children covered'].map(f => (
-                  <div key={f} className="flex items-center gap-1.5" style={{ color: '#555' }}><span style={{ color: '#10B981' }}>✓</span> {f}</div>
-                ))}
-              </div>
-              {upgradeMsg && <p className="text-xs mt-2" style={{ color: upgradeMsg.includes('fail') ? '#C62828' : '#2E7D32' }}>{upgradeMsg}</p>}
-            </div>
-          ) : (
-            <div className="card p-4 mb-4" style={{ borderLeft: '4px solid #10B981' }}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span style={{ fontSize: 18 }}>✓</span>
-                  <div>
-                    <p className="text-sm font-semibold" style={{ color: '#2E7D32' }}>Premium Active</p>
-                    {premiumExpires && <p className="text-xs" style={{ color: '#888' }}>Expires {new Date(premiumExpires).toLocaleDateString()}</p>}
-                  </div>
-                </div>
-                <button onClick={handleFeeReminder} disabled={sendingReminder} className="text-xs px-3 py-1.5 rounded-lg font-medium" style={{ backgroundColor: 'rgba(123,79,155,0.08)', color: '#7B4F9B' }}>
-                  {sendingReminder ? '...' : 'Fee Reminder'}
-                </button>
-              </div>
+              <button onClick={handleFeeReminder} disabled={sendingReminder} className="text-xs px-3 py-1.5 rounded-lg font-medium" style={{ backgroundColor: 'rgba(123,79,155,0.08)', color: '#7B4F9B' }}>
+                {sendingReminder ? '...' : 'Fee Reminder'}
+              </button>
               {reminderMsg && <p className="text-xs mt-1" style={{ color: '#2E7D32' }}>{reminderMsg}</p>}
-              <p className="text-xs mt-2 pt-2 border-t" style={{ color: '#888', borderColor: '#F0F0F0' }}>All WhatsApp alerts active</p>
             </div>
           )}
 
           <div className="space-y-3">
-            {renewalRequired && !isPremium ? (
-              <div className="card p-8 text-center">
-                <p className="text-sm font-semibold" style={{ color: '#333' }}>Renewal Required</p>
-                <p className="text-xs mt-2" style={{ color: '#888' }}>Pay premium above to view your children's details.</p>
+            {/* Hard block — hide ALL details if not paid */}
+            {!isPremium ? (
+              <div className="card p-6 text-center" style={{ borderTop: '4px solid #FFB300' }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
+                <p className="text-base font-bold mb-1" style={{ color: '#333' }}>
+                  Activate Parent Portal
+                </p>
+                {(dashboard || []).length === 0 ? (
+                  <p className="text-sm mb-4" style={{ color: '#555' }}>
+                    Your children have not been linked yet. You can prepay now —
+                    access activates automatically once your school links your child.
+                  </p>
+                ) : (
+                  <p className="text-sm mb-1" style={{ color: '#555' }}>
+                    KSh {premiumPrice} per child per term
+                  </p>
+                )}
+                <p className="text-xs mb-4" style={{ color: '#888' }}>
+                  {(dashboard || []).length > 0
+                    ? `Pay KSh ${premiumTotal} for ${premiumCount} child${premiumCount === 1 ? '' : 'ren'} to unlock full access this term.`
+                    : `Pay KSh ${premiumPrice} to prepay. No children need to be linked first.`
+                  }
+                </p>
+                <div className="mb-3 text-left">
+                  <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>M-Pesa number to charge</label>
+                  <input type="tel" value={renewalPhone} onChange={e => setRenewalPhone(e.target.value)}
+                    className="input-field" placeholder="2547XXXXXXXX" />
+                </div>
+                <button onClick={handleUpgrade} disabled={upgrading} className="btn-primary">
+                  {upgrading ? 'Processing...' : `Pay KSh ${(dashboard || []).length > 0 ? premiumTotal : premiumPrice} via M-Pesa`}
+                </button>
+                {upgradeMsg && (
+                  <p className="text-xs mt-3" style={{ color: upgradeMsg.includes('fail') ? '#C62828' : '#2E7D32' }}>
+                    {upgradeMsg}
+                  </p>
+                )}
+                <div className="mt-4 pt-4 border-t grid grid-cols-2 gap-2 text-xs text-left" style={{ borderColor: '#F0F0F0' }}>
+                  {['Daily absence alerts', '3+ day warnings', 'CBC assessment results', 'Report card downloads', 'Fee balance statements', 'School broadcast messages'].map(f => (
+                    <div key={f} className="flex items-center gap-1.5" style={{ color: '#666' }}>
+                      <span style={{ color: '#FFB300' }}>★</span> {f}
+                    </div>
+                  ))}
+                </div>
               </div>
-            ) : (dashboard || []).length === 0 ? (
-              <div className="card p-8 text-center"><p className="text-sm" style={{ color: '#888' }}>No children found.</p></div>
             ) : null}
 
             <a href="#/merchant" className="card p-4 flex items-center gap-3" style={{ display: 'flex', textDecoration: 'none' }}>
