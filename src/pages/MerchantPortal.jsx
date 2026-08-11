@@ -16,13 +16,9 @@ export default function MerchantPortal({ phone: parentPhone, onBack }) {
   const [adMessage, setAdMessage] = useState('');
   const [campaigns, setCampaigns] = useState([]);
   const [msg, setMsg] = useState('');
-  const [prices, setPrices] = useState({});
 
   useEffect(() => {
     api.get('/api/merchants/schools').then(d => setSchools((d.schools || []).map(s => ({ value: s.school_id, label: s.school_name })))).catch(() => {});
-    api.get('/admin/api/settings').then(d => {
-      if (d.settings) setPrices(d.settings);
-    }).catch(() => {});
   }, []);
 
   async function handleRegister(e) {
@@ -61,11 +57,6 @@ export default function MerchantPortal({ phone: parentPhone, onBack }) {
       setCampaigns(d.data.campaigns || []);
     } catch (err) { setMsg(err.response?.data?.error || 'Failed'); }
     setLoading(false);
-  }
-
-  function getPrice(d) {
-    const key = 'merchant_' + d + '_day';
-    return prices[key] || { 7: 200, 14: 350, 30: 500, 90: 1200 }[d] || 0;
   }
 
   function OTPInput({ onComplete }) {
@@ -116,15 +107,15 @@ export default function MerchantPortal({ phone: parentPhone, onBack }) {
               <div>
                 <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>Duration</label>
                 <select value={days} onChange={e => setDays(Number(e.target.value))} className="input-field">
-                  <option value={7}>7 days — KSh {getPrice(7)}</option>
-                  <option value={14}>14 days — KSh {getPrice(14)}</option>
-                  <option value={30}>30 days — KSh {getPrice(30)}</option>
-                  <option value={90}>90 days — KSh {getPrice(90)}</option>
+                  <option value={7}>7 days</option>
+                  <option value={14}>14 days</option>
+                  <option value={30}>30 days</option>
+                  <option value={90}>90 days</option>
                 </select>
               </div>
               <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Creating...' : 'Create Campaign'}</button>
             </form>
-            {msg && <p className="text-xs mt-2 text-center" style={{ color: msg.includes('Fail') || msg.includes('fail') ? '#C62828' : msg.includes('Pay') ? '#F57F17' : '#2E7D32' }}>{msg}</p>}
+            {msg && <p className="text-xs mt-2 text-center" style={{ color: msg.includes('Fail') || msg.includes('fail') ? '#C62828' : '#2E7D32' }}>{msg}</p>}
           </div>
 
           {campaigns.length > 0 && (
