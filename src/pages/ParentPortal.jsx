@@ -431,10 +431,6 @@ export default function ParentPortal() {
                           <span className="badge-present whitespace-nowrap">{child.class_name}</span>
                         </div>
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <span className={child.last_attendance === 'Present' ? 'badge-present' : 'badge-absent'}>
-                            {child.last_attendance || 'No attendance yet'}
-                          </span>
-                          {child.last_date && <span className="text-xs" style={{ color: '#bbb' }}>Last marked {fmtDate(child.last_date)}</span>}
                           {child.last_payment_amount && (
                             <span className="text-xs" style={{ color: '#888' }}>
                               Paid KSh {child.last_payment_amount}{child.last_payment_date ? ` on ${fmtDate(child.last_payment_date)}` : ''}
