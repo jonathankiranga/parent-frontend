@@ -1,20 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import { getAd, getRandomAd } from '../utils/api.js';
 
-export default function MarketplaceBanner({ schoolId }) {
+export default function MarketplaceBanner({ schoolId, rotate = false, intervalMs = 6000 }) {
   const [ad, setAd] = useState(null);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     const fetch = schoolId ? getAd(schoolId) : getRandomAd();
     fetch.then(data => {
       if (data && data.merchant_name) setAd(data);
     }).catch(() => {});
-  }, [schoolId]);
+  }, [schoolId, tick]);
+
+  useEffect(() => {
+    if (!rotate) return;
+    const t = setInterval(() => setTick(x => x + 1), intervalMs);
+    return () => clearInterval(t);
+  }, [rotate, intervalMs]);
 
   if (!ad) return null;
 
   return (
-    <div className="mt-5 rounded-xl flex items-center gap-3 px-3.5 py-3"
+    <div key={tick + '|' + (ad.merchant_id || ad.merchant_name)}
+      className="ad-enter mt-5 rounded-xl flex items-center gap-3 px-3.5 py-3"
       style={{ backgroundColor: '#FAF8FB', border: '1px solid #EEE7F4' }}>
       {ad.banner_image_url ? (
         <img src={ad.banner_image_url} alt="" className="w-11 h-11 rounded-lg object-cover shrink-0" />

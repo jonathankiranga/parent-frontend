@@ -102,3 +102,9 @@
     box-shadow: 0 1px 0 rgba(0,0,0,0.08);
   }
 }
+
+@keyframes adEnter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ad-enter { animation: adEnter 0.45s ease both; }

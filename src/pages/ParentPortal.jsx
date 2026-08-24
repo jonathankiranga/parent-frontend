@@ -524,6 +524,7 @@ export default function ParentPortal() {
           )}
         </div>
         {error && <div className="mt-3 p-3 rounded-lg text-sm text-center" style={{ backgroundColor: '#FFEBEE', color: '#C62828' }}>{error}</div>}
+        <MarketplaceBanner rotate />
       </div>
     </div>
   );
