@@ -19,8 +19,7 @@ export default function ParentPortal() {
   const [upgrading, setUpgrading] = useState(false);
   const [upgradeMsg, setUpgradeMsg] = useState('');
   const [checkoutRequestId, setCheckoutRequestId] = useState(null);
-  const [sendingReminder, setSendingReminder] = useState(false);
-  const [reminderMsg, setReminderMsg] = useState('');
+  const [pdfNotice, setPdfNotice] = useState('');
   const [exporting, setExporting] = useState(false);
   const [premiumPrice, setPremiumPrice] = useState(100);
   const [premiumTotal, setPremiumTotal] = useState(100);
@@ -135,18 +134,6 @@ export default function ParentPortal() {
     setLoading(false);
   }
 
-  async function handleFeeReminder() {
-    setSendingReminder(true);
-    setReminderMsg('');
-    try {
-      const r = await api.post('/api/parents/fee-reminder', { phone });
-      setReminderMsg(r.data.sent > 0 ? 'Fee details sent to your WhatsApp' : 'No fees found');
-    } catch (err) {
-      setReminderMsg(err.response?.data?.error || 'Failed');
-    }
-    setSendingReminder(false);
-  }
-
   // Poll for payment confirmation after STK push
   useEffect(() => {
     if (!checkoutRequestId) return;
@@ -226,24 +213,26 @@ export default function ParentPortal() {
 
   async function handleDownloadAcademic(child) {
     setExporting(true);
+    setPdfNotice('');
     try {
       const report = await getAcademicReport(child.student_id, selectedTerm, selectedYear);
       const module = await import('../utils/pdfExport.js');
       await module.downloadAcademicPdf(report, child.full_name, phone, selectedTerm);
     } catch (err) {
-      setReminderMsg(err.response?.data?.error || 'Failed to generate academic report');
+      setPdfNotice(err.response?.data?.error || 'Failed to generate academic report');
     }
     setExporting(false);
   }
 
   async function handleDownloadFees(child) {
     setExporting(true);
+    setPdfNotice('');
     try {
       const statement = await getFeeStatement(child.student_id, selectedTerm, selectedYear.toString());
       const module = await import('../utils/pdfExport.js');
       await module.downloadFeePdf(statement, child.full_name, phone, selectedTerm, selectedYear.toString());
     } catch (err) {
-      setReminderMsg(err.response?.data?.error || 'Failed to generate fee statement');
+      setPdfNotice(err.response?.data?.error || 'Failed to generate fee statement');
     }
     setExporting(false);
   }
@@ -387,23 +376,22 @@ export default function ParentPortal() {
             </div>
           ) : (
             <div className="card p-4 mb-4" style={{ borderLeft: '4px solid #10B981' }}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span style={{ fontSize: 18 }}>✓</span>
-                  <div>
-                    <p className="text-sm font-semibold" style={{ color: '#2E7D32' }}>Premium Active</p>
-                    {premiumExpires && <p className="text-xs" style={{ color: '#888' }}>Expires {new Date(premiumExpires).toLocaleDateString()}</p>}
-                  </div>
+              <div className="flex items-center gap-2">
+                <span style={{ fontSize: 18 }}>✓</span>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: '#2E7D32' }}>Premium Active</p>
+                  {premiumExpires && <p className="text-xs" style={{ color: '#888' }}>Expires {new Date(premiumExpires).toLocaleDateString()}</p>}
                 </div>
-                <button onClick={handleFeeReminder} disabled={sendingReminder}
-                  className="text-xs px-3 py-1.5 rounded-lg font-medium" style={{ backgroundColor: 'rgba(123,79,155,0.08)', color: '#7B4F9B' }}>
-                  {sendingReminder ? '...' : 'Fee Reminder'}
-                </button>
               </div>
-              {reminderMsg && <p className="text-xs mt-1" style={{ color: '#2E7D32' }}>{reminderMsg}</p>}
               <div className="text-xs mt-2 pt-2 border-t" style={{ color: '#888', borderColor: '#F0F0F0' }}>
                 All WhatsApp alerts active for your children
               </div>
+            </div>
+          )}
+
+          {pdfNotice && (
+            <div className="card p-3 mb-4" style={{ borderLeft: '4px solid #C62828' }}>
+              <p className="text-xs" style={{ color: '#C62828' }}>{pdfNotice}</p>
             </div>
           )}
 
