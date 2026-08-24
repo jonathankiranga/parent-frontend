@@ -11,6 +11,7 @@ export default function ParentPortal() {
   const [sessionId, setSessionId] = useState('');
   const [dashboard, setDashboard] = useState(null);
   const [schoolId, setSchoolId] = useState(null);
+  const [schoolsInfo, setSchoolsInfo] = useState([]);
   const [isPremium, setIsPremium] = useState(false);
   const [renewalRequired, setRenewalRequired] = useState(false);
   const [premiumExpires, setPremiumExpires] = useState(null);
@@ -43,6 +44,7 @@ export default function ParentPortal() {
     getParentDashboard(saved).then(data => {
       setDashboard(data.children || []);
       setSchoolId(data.school_id);
+      setSchoolsInfo(data.schools || []);
       setIsPremium(Boolean(data.premium_active));
       setRenewalRequired(Boolean(data.renewal_required));
       setPremiumExpires(data.parent?.premium_expires_at || null);
@@ -105,6 +107,7 @@ export default function ParentPortal() {
       const data = await getParentDashboard(phone);
       setDashboard(data.children || []);
       setSchoolId(data.school_id);
+      setSchoolsInfo(data.schools || []);
       setIsPremium(Boolean(data.premium_active));
       setRenewalRequired(Boolean(data.renewal_required));
       setPremiumExpires(data.parent?.premium_expires_at || null);
@@ -153,6 +156,7 @@ export default function ParentPortal() {
           // Refresh dashboard to get updated children
           getParentDashboard(phone).then(data => {
             setDashboard(data.children || []);
+            setSchoolsInfo(data.schools || []);
             setPremiumExpires(data.parent?.premium_expires_at || null);
           }).catch(() => {});
         } else if (r.data.status === 'failed') {
@@ -173,12 +177,12 @@ export default function ParentPortal() {
     return () => clearInterval(timer);
   }, [checkoutRequestId, phone]);
 
-  async function handleUpgrade() {
+  async function handleUpgrade(schoolId) {
     setUpgrading(true);
     setUpgradeMsg('');
     try {
       const targetPhone = (renewalPhone || phone).trim();
-      const r = await api.post('/api/parents/upgrade', { phone: targetPhone });
+      const r = await api.post('/api/parents/upgrade', { phone: targetPhone, school_id: schoolId || undefined });
       if (r.data.status === 'confirmed') {
         // Simulated / dev mode — immediate
         setIsPremium(true);
@@ -230,7 +234,26 @@ export default function ParentPortal() {
     setExporting(false);
   }
 
+  // Group children per school for merged multi-school display + per-school payments
+  function buildSchoolGroups() {
+    if ((schoolsInfo || []).length > 0) {
+      return schoolsInfo.map(s => ({
+        school_id: s.school_id,
+        school_name: s.school_name,
+        count: s.children_count != null ? s.children_count : dashboard.filter(c => c.school_id === s.school_id).length
+      }));
+    }
+    const groups = [];
+    for (const child of dashboard) {
+      let g = groups.find(x => x.school_id === child.school_id);
+      if (!g) { g = { school_id: child.school_id, school_name: child.school_name, count: 0 }; groups.push(g); }
+      g.count++;
+    }
+    return groups;
+  }
+
   if (step === 'dashboard') {
+    const schoolGroups = buildSchoolGroups();
     return (
       <div style={{ backgroundColor: '#F8F8F8', minHeight: '100vh' }}>
         {exporting && (
@@ -290,11 +313,29 @@ export default function ParentPortal() {
                   <p className="text-sm font-semibold" style={{ color: '#333' }}>Renew Premium for This Term</p>
                   <p className="text-xs mt-0.5" style={{ color: '#888' }}>KSh {premiumTotal} total for {premiumCount} linked child{premiumCount === 1 ? '' : 'ren'} — {premiumPrice} per child</p>
                 </div>
-                <button onClick={handleUpgrade} disabled={upgrading}
-                  className="btn-primary text-sm" style={{ padding: '8px 16px', fontSize: 13 }}>
-                  {upgrading ? 'Processing...' : `Pay KSh ${premiumTotal}`}
-                </button>
+                {schoolGroups.length <= 1 && (
+                  <button onClick={() => handleUpgrade(schoolGroups[0]?.school_id)} disabled={upgrading}
+                    className="btn-primary text-sm" style={{ padding: '8px 16px', fontSize: 13 }}>
+                    {upgrading ? 'Processing...' : `Pay KSh ${Math.max(premiumTotal, premiumPrice)}`}
+                  </button>
+                )}
               </div>
+              {schoolGroups.length > 1 && (
+                <div className="space-y-2 mb-3">
+                  {schoolGroups.map(g => (
+                    <div key={g.school_id} className="flex items-center justify-between p-2.5 rounded-lg" style={{ backgroundColor: '#F6F2FA' }}>
+                      <div>
+                        <p className="text-xs font-semibold" style={{ color: '#333' }}>{g.school_name}</p>
+                        <p className="text-xs mt-0.5" style={{ color: '#888' }}>KSh {premiumPrice * Math.max(g.count, 1)} for {g.count} child{g.count === 1 ? '' : 'ren'}</p>
+                      </div>
+                      <button onClick={() => handleUpgrade(g.school_id)} disabled={upgrading}
+                        className="btn-primary text-xs whitespace-nowrap" style={{ padding: '7px 12px', fontSize: 12 }}>
+                        {upgrading ? 'Processing...' : `Pay KSh ${premiumPrice * Math.max(g.count, 1)}`}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <label className="block text-xs font-medium mb-1.5" style={{ color: '#555' }}>M-Pesa number to charge</label>
               <input
                 type="tel"
@@ -336,15 +377,21 @@ export default function ParentPortal() {
           )}
 
           <div className="space-y-3">
-           {renewalRequired ? (
+            {renewalRequired ? (
              <div className="card p-8 text-center">
                <p className="text-sm font-semibold" style={{ color: '#333' }}>Account Locked — Renewal Required</p>
                <p className="text-xs mt-2" style={{ color: '#888' }}>To view your children and access reports you must renew premium for this term.</p>
-               <div className="mt-4">
-                 <button onClick={handleUpgrade} disabled={upgrading} className="btn-primary">{upgrading ? 'Processing...' : `Renew KSh ${premiumTotal}`}</button>
+               <div className="mt-4 space-y-2">
+                 {schoolGroups.length > 1 ? schoolGroups.map(g => (
+                   <button key={g.school_id} onClick={() => handleUpgrade(g.school_id)} disabled={upgrading} className="btn-primary w-full" style={{ fontSize: 13 }}>
+                     {upgrading ? 'Processing...' : `${g.school_name} — KSh ${premiumPrice * Math.max(g.count, 1)}`}
+                   </button>
+                 )) : (
+                   <button onClick={() => handleUpgrade(schoolGroups[0]?.school_id)} disabled={upgrading} className="btn-primary">{upgrading ? 'Processing...' : `Renew KSh ${premiumTotal}`}</button>
+                 )}
                </div>
              </div>
-           ) : (
+            ) : (
              dashboard.length === 0 && <div className="card p-8 text-center"><p className="text-sm" style={{ color: '#888' }}>No children linked to this phone.</p></div>
            )}
  
@@ -363,7 +410,12 @@ export default function ParentPortal() {
             {!renewalRequired && isPremium && dashboard.map((child, i) => (
               <div key={i} className="card p-4">
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className="font-semibold" style={{ color: '#333' }}>{child.full_name}</h3>
+                  <div>
+                    <h3 className="font-semibold" style={{ color: '#333' }}>{child.full_name}</h3>
+                    {schoolGroups.length > 1 && child.school_name && (
+                      <p className="text-xs mt-0.5" style={{ color: '#888' }}>{child.school_name}</p>
+                    )}
+                  </div>
                   <span className="badge-present">{child.class_name}</span>
                 </div>
                 <div className="flex items-center gap-2 mt-3 pt-3 border-t" style={{ borderColor: '#F0F0F0' }}>
