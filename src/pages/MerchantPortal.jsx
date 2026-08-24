@@ -2,54 +2,71 @@ import React, { useState, useEffect } from 'react';
 import api, { registerMerchant, requestMerchantOtp, verifyMerchantOtp, addMerchantProduct, getMerchantProducts, deactivateMerchantProduct } from '../utils/api.js';
 
 export default function MerchantPortal({ phone: parentPhone, onBack }) {
-  const [business_name, setBusiness_name] = useState('');
+  const [step, setStep] = useState('register');
+  const [businessName, setBusinessName] = useState('');
   const [identifier, setIdentifier] = useState(parentPhone || '');
+  const [sessionId, setSessionId] = useState('');
+  const [merchantId, setMerchantId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [schools, setSchools] = useState([]);
+  const [targetSchool, setTargetSchool] = useState('');
+  const [days, setDays] = useState(7);
+  const [adMessage, setAdMessage] = useState('');
+  const [campaigns, setCampaigns] = useState([]);
+  const [msg, setMsg] = useState('');
+  const [products, setProducts] = useState([]);
+  const [prodForm, setProdForm] = useState({ name: '', category: 'Uniforms', price: '', description: '' });
+  const [prodMsg, setProdMsg] = useState('');
 
-  async function handleRegister(e) {
+  useEffect(() => {
+    api.get('/api/merchants/schools').then(d => setSchools((d.schools || []).map(s => ({ value: s.school_id, label: s.school_name })))).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (step === 'dashboard' && merchantId) {
+      getMerchantProducts(merchantId).then(d => setProducts(d.products || [])).catch(() => {});
+    }
+  }, [step, merchantId]);
+
+  async function handleAddProduct(e) {
     e.preventDefault();
-    setLoading(true); setError('');
+    setLoading(true); setProdMsg('');
     try {
-      const isEmail = identifier.includes('@');
-      const body = { business_name, ...(isEmail ? { email: identifier } : { phone: identifier }) };
-      const data = await registerMerchant(body);
-      setMerchantId(data.merchant_id);
-      setSessionId(data.session_id);
-      setStep('otp');
+      await addMerchantProduct({
+        merchant_id: merchantId,
+        name: prodForm.name,
+        category: prodForm.category,
+        price: parseFloat(prodForm.price) || 0,
+        description: prodForm.description
+      });
+      setProdMsg('Listing published');
+      setProdForm({ name: '', category: prodForm.category, price: '', description: '' });
+      const d = await getMerchantProducts(merchantId);
+      setProducts(d.products || []);
     } catch (err) {
-      const msgText = err.response?.data?.error || 'Failed';
-      setError(msgText);
-      if (msgText.includes('already registered')) {
-        try {
-          const d = await requestMerchantOtp(identifier);
-          setSessionId(d.session_id);
-          setStep('otp');
-          setError('');
-        } catch (e2) { /* keep the 409 message */ }
-      }
+      setProdMsg(err.response?.data?.error || 'Failed to publish');
     }
     setLoading(false);
   }
 
-  return (
-    <form onSubmit={handleRegister}>
-      <div className="mb-3">
-        <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>Business Name</label>
-        <input value={business_name} onChange={e => setBusiness_name(e.target.value)} className="input-field" required />
-      </div>
-      <div className="mb-3">
-        <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>Email or Phone Number</label>
-        <input value={identifier} onChange={e => setIdentifier(e.target.value)} className="input-field" placeholder="kirangajon@gmail.com or 254712345678" />
-      </div>
-      <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Registering...' : 'Register & Send OTP'}</button>
-    </form>
+  async function handleHideProduct(productId) {
+    try {
+      await deactivateMerchantProduct(merchantId, productId);
+      setProducts(ps => ps.map(p => p.product_id === productId ? { ...p, active: 0 } : p));
+    } catch (err) {
+      setProdMsg(err.response?.data?.error || 'Failed');
+    }
+  }
 
   async function handleRegister(e) {
     e.preventDefault();
     setLoading(true); setError('');
     try {
-      const data = await registerMerchant({ business_name: businessName, phone, email });
+      const value = identifier.trim();
+      const isEmail = value.includes('@');
+      const body = { business_name: businessName.trim(), ...(isEmail ? { email: value } : { phone: value }) };
+      const data = await registerMerchant(body);
       setMerchantId(data.merchant_id);
       setSessionId(data.session_id);
       setStep('otp');
@@ -59,7 +76,7 @@ export default function MerchantPortal({ phone: parentPhone, onBack }) {
       if (msgText.includes('already registered')) {
         // Returning merchant — send a login code instead
         try {
-          const d = await requestMerchantOtp(phone.includes('@') || !phone ? email || phone : phone);
+          const d = await requestMerchantOtp(identifier);
           setSessionId(d.session_id);
           setStep('otp');
           setError('');
@@ -254,14 +271,10 @@ export default function MerchantPortal({ phone: parentPhone, onBack }) {
                 <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>Business Name</label>
                 <input value={businessName} onChange={e => setBusinessName(e.target.value)} className="input-field" required />
               </div>
-              <div className="mb-3">
-                <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>Phone Number</label>
-                <input value={phone} onChange={e => setPhone(e.target.value)} className="input-field" placeholder="254712345678" required />
-                <p className="text-xs mt-1" style={{ color: '#999' }}>This is the number parents will see on your listings.</p>
-              </div>
               <div className="mb-4">
-                <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>Email (optional)</label>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input-field" />
+                <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>Email or Phone Number</label>
+                <input value={identifier} onChange={e => setIdentifier(e.target.value)} className="input-field" placeholder="kirangajon@gmail.com or 254712345678" required />
+                <p className="text-xs mt-1" style={{ color: '#999' }}>We send your login code here. Parents see your profile number on listings.</p>
               </div>
               <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Sending...' : 'Register & Send OTP'}</button>
             </form>
@@ -270,7 +283,7 @@ export default function MerchantPortal({ phone: parentPhone, onBack }) {
           {step === 'otp' && (
             <div>
               <p className="text-sm mb-1 text-center" style={{ color: '#666' }}>Enter the code sent to</p>
-              <p className="text-base font-semibold mb-5 text-center" style={{ color: '#7B4F9B' }}>{phone}</p>
+              <p className="text-base font-semibold mb-5 text-center" style={{ color: '#7B4F9B' }}>{identifier}</p>
               <OTPInput onComplete={handleVerify} />
             </div>
           )}
