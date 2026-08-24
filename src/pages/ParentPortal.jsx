@@ -461,6 +461,8 @@ export default function ParentPortal() {
               </div>
             ))}
  
+          <MarketplaceBanner schoolId={schoolGroups[0]?.school_id} />
+
           <a href="#/merchant"
             className="card p-4 flex items-center gap-3"
             style={{ display: 'flex', textDecoration: 'none' }}>
@@ -496,8 +498,6 @@ export default function ParentPortal() {
           <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.7)' }}>Powered by Smarternow Data Venture</p>
         </div>
 
-        <MarketplaceBanner />
-
         <div className="bg-white rounded-card p-6 shadow-xl">
           {step === 'phone' && (
             <form onSubmit={handleRequestOtp}>
@@ -524,7 +524,6 @@ export default function ParentPortal() {
           )}
         </div>
         {error && <div className="mt-3 p-3 rounded-lg text-sm text-center" style={{ backgroundColor: '#FFEBEE', color: '#C62828' }}>{error}</div>}
-        <MarketplaceBanner />
       </div>
     </div>
   );
