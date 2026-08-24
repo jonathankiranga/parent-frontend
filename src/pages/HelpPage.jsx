@@ -26,7 +26,7 @@ export default function HelpPage() {
 
         <div className="card p-5">
           <h2 className="text-base font-bold mb-4" style={{ color: '#7B4F9B' }}>Free Features</h2>
-          <p className="text-sm leading-relaxed" style={{ color: '#666' }}>View your children's attendance anytime. Check their class and last attendance date. Log in from any phone.</p>
+          <p className="text-sm leading-relaxed" style={{ color: '#666' }}>View your children's attendance anytime. Check their class and last attendance date. View and download fee statements free. Log in from any phone.</p>
         </div>
 
         <div className="card p-5">
@@ -44,7 +44,7 @@ export default function HelpPage() {
 
         <div className="card p-5">
           <h2 className="text-base font-bold mb-4" style={{ color: '#7B4F9B' }}>Fee Balance</h2>
-          <p className="text-sm leading-relaxed" style={{ color: '#666' }}>Once subscribed, tap <b>Fee Statement</b> under any child to download their current fee balance as a PDF.</p>
+          <p className="text-sm leading-relaxed" style={{ color: '#666' }}>Tap <b>Fee Statement</b> under any child to see their current fee balance as a PDF — free for all parents.</p>
         </div>
 
         <div className="card p-5">

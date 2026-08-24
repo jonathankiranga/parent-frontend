@@ -220,7 +220,7 @@ export default function ParentPortal() {
     setExporting(true);
     setPdfNotice('');
     try {
-      const report = await getAcademicReport(child.student_id, selectedTerm, selectedYear);
+      const report = await getAcademicReport(child.student_id, selectedTerm, selectedYear, phone);
       const module = await import('../utils/pdfExport.js');
       await module.downloadAcademicPdf(report, child.full_name, phone, selectedTerm);
     } catch (err) {
@@ -230,10 +230,6 @@ export default function ParentPortal() {
   }
 
   async function handleDownloadFees(child) {
-    if (!isPremium) {
-      setPdfNotice('Fee statements are available with an active subscription. Tap Upgrade above to activate.');
-      return;
-    }
     setExporting(true);
     setPdfNotice('');
     try {
@@ -340,7 +336,7 @@ export default function ParentPortal() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold" style={{ color: '#333' }}>Free plan</p>
-                  <p className="text-xs mt-0.5" style={{ color: '#888' }}>Viewing your children is free. Report cards, fee statements and WhatsApp alerts come with a subscription.</p>
+                  <p className="text-xs mt-0.5" style={{ color: '#888' }}>Viewing your children's fees is free. Report cards and WhatsApp alerts come with a subscription.</p>
                 </div>
                 <button onClick={() => setShowUpgrade(s => !s)} className="btn-secondary text-xs whitespace-nowrap">
                   {showUpgrade ? 'Close' : 'Upgrade'}
@@ -453,9 +449,8 @@ export default function ParentPortal() {
                         onClick={() => handleDownloadFees(child)}
                         disabled={exporting}
                         className="btn-secondary text-xs flex-1"
-                        style={!isPremium ? { opacity: 0.55 } : undefined}
                       >
-                        Fee Statement{!isPremium ? ' — Locked' : ` (${selectedTerm})`}
+                        Fee Statement ({selectedTerm})
                       </button>
                     </div>
                   </div>

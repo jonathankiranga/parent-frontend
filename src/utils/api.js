@@ -49,9 +49,9 @@ export async function getPremiumStatus(phone) {
   return data;
 }
 
-export async function getAcademicReport(studentId, term, year) {
+export async function getAcademicReport(studentId, term, year, phone) {
   const { data } = await api.get(`/api/assessments/report/${encodeURIComponent(studentId)}/${encodeURIComponent(term)}`, {
-    params: { year }
+    params: { year, phone }
   });
   return data;
 }
