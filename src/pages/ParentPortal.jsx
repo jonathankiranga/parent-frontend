@@ -64,33 +64,39 @@ export default function ParentPortal() {
     setLoading(true);
     setError('');
     try {
-      // Check premium status first to show renewal/locked UI at login
-      const status = await getPremiumStatus(phone);
-      setPremiumPrice(status.premium_price || 100);
-      setPremiumTotal(status.premium_total || 100);
-      setPremiumCount(status.premium_children_count || 1);
-      setRenewalPhone(phone);
+      const identifier = phone.trim();
+      const isEmail = identifier.includes('@');
 
-      if (status.registered === false) {
-        // Phone not registered as a parent — show helpful message with next steps
-        setError('This phone number is not registered as a parent in the system. Please contact the school or support to link your children.');
-        setLoading(false);
-        return;
+      if (!isEmail) {
+        // Check premium status first to show renewal/locked UI at login
+        const status = await getPremiumStatus(identifier);
+        setPremiumPrice(status.premium_price || 100);
+        setPremiumTotal(status.premium_total || 100);
+        setPremiumCount(status.premium_children_count || 1);
+        setRenewalPhone(identifier);
+
+        if (status.registered === false) {
+          // Phone not registered as a parent — show helpful message with next steps
+          setError('This phone number is not registered as a parent in the system. Please contact the school or support to link your children.');
+          setLoading(false);
+          return;
+        }
+
+        if (status.renewal_required) {
+          // Show pay wall but still allow them to proceed to OTP so they can pay from dashboard
+          setRenewalRequired(true);
+          // Still send OTP so they can log in and pay from within the dashboard
+          const data = await requestParentOtp(identifier);
+          setSessionId(data.session_id);
+          setStep('otp');
+          setLoading(false);
+          return;
+        }
       }
 
-      if (status.renewal_required) {
-        // Show pay wall but still allow them to proceed to OTP so they can pay from dashboard
-        setRenewalRequired(true);
-        // Still send OTP so they can log in and pay from within the dashboard
-        const data = await requestParentOtp(phone);
-        setSessionId(data.session_id);
-        setStep('otp');
-        setLoading(false);
-        return;
-      }
-
-      // If premium is active, proceed to request OTP as usual
-      const data = await requestParentOtp(phone);
+      // Email logins skip the pre-check — the backend resolves the email
+      // to the registered parent profile after OTP verification.
+      const data = await requestParentOtp(identifier);
       setSessionId(data.session_id);
       setStep('otp');
     } catch (err) {
@@ -103,8 +109,10 @@ export default function ParentPortal() {
     setLoading(true);
     setError('');
     try {
-      await verifyParentOtp(sessionId, code);
-      const data = await getParentDashboard(phone);
+      const v = await verifyParentOtp(sessionId, code);
+      // Email logins resolve to the profile's canonical phone server-side
+      const effective = v.phone || phone.trim();
+      const data = await getParentDashboard(effective);
       setDashboard(data.children || []);
       setSchoolId(data.school_id);
       setSchoolsInfo(data.schools || []);
@@ -114,8 +122,9 @@ export default function ParentPortal() {
       setPremiumPrice(data.premium_price || 100);
       setPremiumTotal(data.premium_total || 100);
       setPremiumCount(data.premium_children_count || (data.children?.length || 1));
-      setRenewalPhone(phone);
-      sessionStorage.setItem('parent_phone', phone); // persist across page refreshes
+      setPhone(effective);
+      setRenewalPhone(effective);
+      sessionStorage.setItem('parent_phone', effective); // persist across page refreshes
       setStep('dashboard');
     } catch (err) {
       setError(err.response?.data?.error || 'Invalid code');
@@ -461,8 +470,16 @@ export default function ParentPortal() {
         <div className="bg-white rounded-card p-6 shadow-xl">
           {step === 'phone' && (
             <form onSubmit={handleRequestOtp}>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: '#555' }}>Phone Number</label>
-              <input type="tel" placeholder="e.g. 254712345678" value={phone} onChange={e => setPhone(e.target.value)} className="input-field mb-4" required />
+              <label className="block text-sm font-medium mb-1.5" style={{ color: '#555' }}>Email or Phone Number</label>
+              <input
+                type="text"
+                inputMode="email"
+                placeholder="email@example.com or 254712345678"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                className="input-field mb-4"
+                required
+              />
               <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Sending...' : 'Continue with OTP'}</button>
             </form>
           )}

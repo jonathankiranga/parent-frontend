@@ -6,8 +6,10 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' }
 });
 
-export async function requestParentOtp(phone) {
-  const { data } = await api.post('/api/parents/request-otp', { phone });
+export async function requestParentOtp(identifier) {
+  const value = String(identifier || '').trim();
+  const body = value.includes('@') ? { email: value } : { phone: value };
+  const { data } = await api.post('/api/parents/request-otp', body);
   return data;
 }
 
