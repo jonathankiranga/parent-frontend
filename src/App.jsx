@@ -1,10 +1,12 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import ParentPortal from './pages/ParentPortal.jsx';
 import MerchantPortal from './pages/MerchantPortal.jsx';
 import HelpPage from './pages/HelpPage.jsx';
 
 export default function App() {
+  const navigate = useNavigate();
+
   // Suppress the browser's native install banner entirely — users can still
   // install manually from the browser menu
   if (typeof window !== 'undefined') {
@@ -16,7 +18,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/parent" replace />} />
         <Route path="/parent" element={<ParentPortal />} />
-        <Route path="/merchant" element={<MerchantPortal />} />
+        <Route path="/merchant" element={<MerchantPortal onBack={() => navigate('/parent')} />} />
         <Route path="/help" element={<HelpPage />} />
       </Routes>
     </>
