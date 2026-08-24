@@ -5,6 +5,12 @@ import MerchantPortal from './pages/MerchantPortal.jsx';
 import HelpPage from './pages/HelpPage.jsx';
 
 export default function App() {
+  // Suppress the browser's native install banner entirely — users can still
+  // install manually from the browser menu
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeinstallprompt', e => e.preventDefault());
+  }
+
   return (
     <>
       <Routes>
