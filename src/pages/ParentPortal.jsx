@@ -12,6 +12,7 @@ export default function ParentPortal() {
   const [dashboard, setDashboard] = useState(null);
   const [schoolId, setSchoolId] = useState(null);
   const [schoolsInfo, setSchoolsInfo] = useState([]);
+  const [parentName, setParentName] = useState('');
   const [isPremium, setIsPremium] = useState(false);
   const [renewalRequired, setRenewalRequired] = useState(false);
   const [premiumExpires, setPremiumExpires] = useState(null);
@@ -45,6 +46,7 @@ export default function ParentPortal() {
       setDashboard(data.children || []);
       setSchoolId(data.school_id);
       setSchoolsInfo(data.schools || []);
+      setParentName(data.parent?.parent_name || '');
       setIsPremium(Boolean(data.premium_active));
       setRenewalRequired(Boolean(data.renewal_required));
       setPremiumExpires(data.parent?.premium_expires_at || null);
@@ -116,6 +118,7 @@ export default function ParentPortal() {
       setDashboard(data.children || []);
       setSchoolId(data.school_id);
       setSchoolsInfo(data.schools || []);
+      setParentName(data.parent?.parent_name || '');
       setIsPremium(Boolean(data.premium_active));
       setRenewalRequired(Boolean(data.renewal_required));
       setPremiumExpires(data.parent?.premium_expires_at || null);
@@ -166,6 +169,8 @@ export default function ParentPortal() {
           getParentDashboard(phone).then(data => {
             setDashboard(data.children || []);
             setSchoolsInfo(data.schools || []);
+            setParentName(data.parent?.parent_name || parentName);
+      setParentName(data.parent?.parent_name || '');
             setPremiumExpires(data.parent?.premium_expires_at || null);
           }).catch(() => {});
         } else if (r.data.status === 'failed') {
@@ -245,20 +250,23 @@ export default function ParentPortal() {
 
   // Group children per school for merged multi-school display + per-school payments
   function buildSchoolGroups() {
-    if ((schoolsInfo || []).length > 0) {
-      return schoolsInfo.map(s => ({
-        school_id: s.school_id,
-        school_name: s.school_name,
-        count: s.children_count != null ? s.children_count : dashboard.filter(c => c.school_id === s.school_id).length
-      }));
-    }
     const groups = [];
-    for (const child of dashboard) {
-      let g = groups.find(x => x.school_id === child.school_id);
-      if (!g) { g = { school_id: child.school_id, school_name: child.school_name, count: 0 }; groups.push(g); }
-      g.count++;
-    }
+    const ensure = (id, name) => {
+      let g = groups.find(x => x.school_id === id);
+      if (!g) { g = { school_id: id, school_name: name || 'My School', children: [] }; groups.push(g); }
+      return g;
+    };
+    (schoolsInfo || []).forEach(s => ensure(s.school_id, s.school_name));
+    (dashboard || []).forEach(child => {
+      const info = (schoolsInfo || []).find(s => s.school_id === child.school_id);
+      const g = ensure(child.school_id, child.school_name || (info ? info.school_name : ''));
+      g.children.push(child);
+    });
     return groups;
+  }
+
+  function initialsOf(name) {
+    return String(name || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
   }
 
   if (step === 'dashboard') {
@@ -278,12 +286,26 @@ export default function ParentPortal() {
         )}
 
         <div className="max-w-lg mx-auto px-4 py-6">
-          <div className="flex items-center justify-between mb-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-xl font-bold" style={{ color: '#333' }}>My Children</h1>
+              <p className="text-xs font-semibold tracking-wide" style={{ color: '#7B4F9B' }}>PARENT PORTAL</p>
+              <h1 className="text-xl font-bold" style={{ color: '#333' }}>{parentName || 'Welcome'}</h1>
               <p className="text-xs mt-0.5" style={{ color: '#888' }}>{phone}</p>
             </div>
             <button onClick={() => { sessionStorage.removeItem('parent_phone'); setStep('phone'); setPhone(''); setDashboard(null); }} className="btn-secondary text-xs">Logout</button>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className="card p-3 text-center">
+              <p className="text-lg font-bold" style={{ color: '#7B4F9B' }}>{(dashboard || []).length}</p>
+              <p className="text-xs" style={{ color: '#888' }}>Child{(dashboard || []).length === 1 ? '' : 'ren'}</p>
+            </div>
+            <div className="card p-3 text-center">
+              <p className="text-lg font-bold" style={{ color: '#7B4F9B' }}>{schoolGroups.length}</p>
+              <p className="text-xs" style={{ color: '#888' }}>School{schoolGroups.length === 1 ? '' : 's'}</p>
+            </div>
           </div>
 
           {/* Term / Year selector — applies to all PDF downloads */}
@@ -335,11 +357,11 @@ export default function ParentPortal() {
                     <div key={g.school_id} className="flex items-center justify-between p-2.5 rounded-lg" style={{ backgroundColor: '#F6F2FA' }}>
                       <div>
                         <p className="text-xs font-semibold" style={{ color: '#333' }}>{g.school_name}</p>
-                        <p className="text-xs mt-0.5" style={{ color: '#888' }}>KSh {premiumPrice * Math.max(g.count, 1)} for {g.count} child{g.count === 1 ? '' : 'ren'}</p>
+                        <p className="text-xs mt-0.5" style={{ color: '#888' }}>KSh {premiumPrice * Math.max(g.children.length, 1)} for {g.children.length} child{g.children.length === 1 ? '' : 'ren'}</p>
                       </div>
                       <button onClick={() => handleUpgrade(g.school_id)} disabled={upgrading}
                         className="btn-primary text-xs whitespace-nowrap" style={{ padding: '7px 12px', fontSize: 12 }}>
-                        {upgrading ? 'Processing...' : `Pay KSh ${premiumPrice * Math.max(g.count, 1)}`}
+                        {upgrading ? 'Processing...' : `Pay KSh ${premiumPrice * Math.max(g.children.length, 1)}`}
                       </button>
                     </div>
                   ))}
@@ -386,23 +408,68 @@ export default function ParentPortal() {
           )}
 
           <div className="space-y-3">
-            {renewalRequired ? (
-             <div className="card p-8 text-center">
-               <p className="text-sm font-semibold" style={{ color: '#333' }}>Account Locked — Renewal Required</p>
-               <p className="text-xs mt-2" style={{ color: '#888' }}>To view your children and access reports you must renew premium for this term.</p>
-               <div className="mt-4 space-y-2">
-                 {schoolGroups.length > 1 ? schoolGroups.map(g => (
-                   <button key={g.school_id} onClick={() => handleUpgrade(g.school_id)} disabled={upgrading} className="btn-primary w-full" style={{ fontSize: 13 }}>
-                     {upgrading ? 'Processing...' : `${g.school_name} — KSh ${premiumPrice * Math.max(g.count, 1)}`}
-                   </button>
-                 )) : (
-                   <button onClick={() => handleUpgrade(schoolGroups[0]?.school_id)} disabled={upgrading} className="btn-primary">{upgrading ? 'Processing...' : `Renew KSh ${premiumTotal}`}</button>
-                 )}
-               </div>
-             </div>
-            ) : (
-             dashboard.length === 0 && <div className="card p-8 text-center"><p className="text-sm" style={{ color: '#888' }}>No children linked to this phone.</p></div>
-           )}
+            {(dashboard || []).length === 0 && (
+              <div className="card p-8 text-center">
+                <p className="text-sm font-semibold" style={{ color: '#333' }}>No children linked yet</p>
+                <p className="text-xs mt-1" style={{ color: '#888' }}>Ask your school to link your phone ({phone}) to your children.</p>
+              </div>
+            )}
+
+            {schoolGroups.map(g => (
+              <div key={g.school_id || g.school_name}>
+                <div className="flex items-center justify-between mb-2 mt-4">
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: '#F6F2FA', fontSize: 13 }}>🏫</span>
+                    <div>
+                      <h2 className="text-sm font-bold leading-tight" style={{ color: '#333' }}>{g.school_name}</h2>
+                      <p className="text-xs" style={{ color: '#888' }}>{g.children.length} child{g.children.length === 1 ? '' : 'ren'}</p>
+                    </div>
+                  </div>
+                  {!isPremium && g.children.length > 0 && (
+                    <button onClick={() => handleUpgrade(g.school_id)} disabled={upgrading}
+                      className="btn-primary text-xs whitespace-nowrap" style={{ padding: '6px 10px', fontSize: 11 }}>
+                      {upgrading ? 'Processing...' : `Activate KSh ${premiumPrice * Math.max(g.children.length, 1)}`}
+                    </button>
+                  )}
+                </div>
+
+                {g.children.map(child => (
+                  <div key={child.student_id} className="card p-4 mb-3">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-full flex items-center justify-center font-bold shrink-0"
+                        style={{ width: 44, height: 44, backgroundColor: 'rgba(123,79,155,0.12)', color: '#7B4F9B', fontSize: 15 }}>
+                        {initialsOf(child.full_name)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="font-semibold truncate" style={{ color: '#333' }}>{child.full_name}</h3>
+                          <span className="badge-present whitespace-nowrap">{child.class_name}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <span className={child.last_attendance === 'Present' ? 'badge-present' : 'badge-absent'}>
+                            {child.last_attendance || 'No attendance yet'}
+                          </span>
+                          {child.last_date && <span className="text-xs" style={{ color: '#bbb' }}>{child.last_date}</span>}
+                          {child.last_payment_amount && (
+                            <span className="text-xs" style={{ color: '#888' }}>
+                              Paid KSh {child.last_payment_amount}{child.last_payment_date ? ` - ${child.last_payment_date}` : ''}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-3 pt-3 border-t" style={{ borderColor: '#F0F0F0' }}>
+                      <button onClick={() => handleDownloadAcademic(child)} disabled={exporting} className="btn-secondary text-xs flex-1">
+                        Report PDF ({selectedTerm})
+                      </button>
+                      <button onClick={() => handleDownloadFees(child)} disabled={exporting} className="btn-secondary text-xs flex-1">
+                        Fees PDF ({selectedTerm})
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
  
           <a href="#/merchant"
             className="card p-4 flex items-center gap-3"
@@ -416,32 +483,6 @@ export default function ParentPortal() {
             </div>
             <span className="ml-auto" style={{ color: '#bbb' }}>→</span>
           </a>
-            {!renewalRequired && isPremium && dashboard.map((child, i) => (
-              <div key={i} className="card p-4">
-                <div className="flex items-center justify-between mb-1">
-                  <div>
-                    <h3 className="font-semibold" style={{ color: '#333' }}>{child.full_name}</h3>
-                    {schoolGroups.length > 1 && child.school_name && (
-                      <p className="text-xs mt-0.5" style={{ color: '#888' }}>{child.school_name}</p>
-                    )}
-                  </div>
-                  <span className="badge-present">{child.class_name}</span>
-                </div>
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t" style={{ borderColor: '#F0F0F0' }}>
-                  <span className="text-xs" style={{ color: '#888' }}>Last attendance:</span>
-                  <span className={child.last_attendance === 'Present' ? 'badge-present' : 'badge-absent'}>{child.last_attendance || 'N/A'}</span>
-                  {child.last_date && <span className="text-xs" style={{ color: '#bbb' }}>{child.last_date}</span>}
-                </div>
-                <div className="flex gap-2 mt-3">
-                  <button onClick={() => handleDownloadAcademic(child)} disabled={exporting} className="btn-secondary text-xs">
-                    Report PDF ({selectedTerm})
-                  </button>
-                  <button onClick={() => handleDownloadFees(child)} disabled={exporting} className="btn-secondary text-xs">
-                    Fees PDF ({selectedTerm})
-                  </button>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </div>
