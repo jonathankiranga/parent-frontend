@@ -30,7 +30,7 @@ export default function HelpPage() {
         </div>
 
         <div className="card p-5">
-          <h2 className="text-base font-bold mb-4" style={{ color: '#7B4F9B' }}>Premium WhatsApp Alerts — KSh 100/term</h2>
+          <h2 className="text-base font-bold mb-4" style={{ color: '#7B4F9B' }}>Subscription — KSh 100/term</h2>
           <div className="space-y-2 text-sm" style={{ color: '#666' }}>
             <p>✓ <b>Daily absence alerts</b> — notified immediately when your child is marked Absent</p>
             <p>✓ <b>3+ day absence warnings</b> — escalated alert for consecutive absences</p>
@@ -39,12 +39,12 @@ export default function HelpPage() {
             <p>✓ <b>School broadcast messages</b> — important announcements from the school</p>
             <p>✓ <b>All children covered</b> — one subscription for the whole family</p>
           </div>
-          <p className="text-sm mt-3" style={{ color: '#333' }}>Tap <b>KSh 100</b> on your dashboard to upgrade. Pay via M-Pesa. Alerts activate immediately.</p>
+          <p className="text-sm mt-3" style={{ color: '#333' }}>Tap <b>Upgrade</b> on your dashboard to subscribe. Pay via M-Pesa � you confirm every payment with your own PIN.</p>
         </div>
 
         <div className="card p-5">
           <h2 className="text-base font-bold mb-4" style={{ color: '#7B4F9B' }}>Fee Balance</h2>
-          <p className="text-sm leading-relaxed" style={{ color: '#666' }}>After upgrading to Premium, tap <b>Fee Reminder</b> on your dashboard. Your current fee balance for each child is sent to your WhatsApp.</p>
+          <p className="text-sm leading-relaxed" style={{ color: '#666' }}>Once subscribed, tap <b>Fee Statement</b> under any child to download their current fee balance as a PDF.</p>
         </div>
 
         <div className="card p-5">
@@ -52,7 +52,7 @@ export default function HelpPage() {
           <div className="space-y-2 text-sm" style={{ color: '#666' }}>
             <p>• Keep your phone number updated with the school</p>
             <p>• OTPs are sent via WhatsApp — make sure WhatsApp is working</p>
-            <p>• Premium covers all children linked to your number</p>
+            <p>• One subscription covers all children linked to your number</p>
             <p>• For help, ask your school head or contact Smarternow Data Venture</p>
           </div>
         </div>

@@ -20,6 +20,7 @@ export default function ParentPortal() {
   const [upgradeMsg, setUpgradeMsg] = useState('');
   const [checkoutRequestId, setCheckoutRequestId] = useState(null);
   const [pdfNotice, setPdfNotice] = useState('');
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [premiumPrice, setPremiumPrice] = useState(100);
   const [premiumTotal, setPremiumTotal] = useState(100);
@@ -151,7 +152,7 @@ export default function ParentPortal() {
           setIsPremium(true);
           setRenewalRequired(false);
           setUpgrading(false);
-          setUpgradeMsg('✓ Payment confirmed — premium activated!');
+          setUpgradeMsg('✓ Payment confirmed — subscription activated!');
           // Refresh dashboard to get updated children
           getParentDashboard(phone).then(data => {
             setDashboard(data.children || []);
@@ -192,7 +193,7 @@ export default function ParentPortal() {
         const expires = new Date();
         expires.setMonth(expires.getMonth() + 4);
         setPremiumExpires(expires.toISOString());
-        setUpgradeMsg('✓ Premium activated');
+        setUpgradeMsg('✓ Subscription activated');
         setUpgrading(false);
       } else if (r.data.status === 'school_paid') {
         setIsPremium(true);
@@ -212,6 +213,10 @@ export default function ParentPortal() {
   }
 
   async function handleDownloadAcademic(child) {
+    if (!isPremium) {
+      setPdfNotice('Report cards are available with an active subscription. Tap Upgrade above to activate.');
+      return;
+    }
     setExporting(true);
     setPdfNotice('');
     try {
@@ -225,6 +230,10 @@ export default function ParentPortal() {
   }
 
   async function handleDownloadFees(child) {
+    if (!isPremium) {
+      setPdfNotice('Fee statements are available with an active subscription. Tap Upgrade above to activate.');
+      return;
+    }
     setExporting(true);
     setPdfNotice('');
     try {
@@ -325,66 +334,57 @@ export default function ParentPortal() {
             </div>
           </div>
 
-          {/* Premium Banner */}
+          {/* Plan status — quiet, honest, no pressure */}
           {!isPremium ? (
-            <div className="card p-4 mb-4" style={{ borderLeft: '4px solid #FFB300' }}>
-              <div className="flex items-center justify-between mb-3">
+            <div className="card p-4 mb-4">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold" style={{ color: '#333' }}>Renew Premium for This Term</p>
-                  <p className="text-xs mt-0.5" style={{ color: '#888' }}>KSh {premiumTotal} total for {premiumCount} linked child{premiumCount === 1 ? '' : 'ren'} — {premiumPrice} per child</p>
+                  <p className="text-sm font-semibold" style={{ color: '#333' }}>Free plan</p>
+                  <p className="text-xs mt-0.5" style={{ color: '#888' }}>Viewing your children is free. Report cards, fee statements and WhatsApp alerts come with a subscription.</p>
                 </div>
-                {schoolGroups.length <= 1 && (
-                  <button onClick={() => handleUpgrade(schoolGroups[0]?.school_id)} disabled={upgrading}
-                    className="btn-primary text-sm" style={{ padding: '8px 16px', fontSize: 13 }}>
-                    {upgrading ? 'Processing...' : `Pay KSh ${Math.max(premiumTotal, premiumPrice)}`}
-                  </button>
-                )}
+                <button onClick={() => setShowUpgrade(s => !s)} className="btn-secondary text-xs whitespace-nowrap">
+                  {showUpgrade ? 'Close' : 'Upgrade'}
+                </button>
               </div>
-              {schoolGroups.length > 1 && (
-                <div className="space-y-2 mb-3">
-                  {schoolGroups.map(g => (
-                    <div key={g.school_id} className="flex items-center justify-between p-2.5 rounded-lg" style={{ backgroundColor: '#F6F2FA' }}>
+              {showUpgrade && (
+                <div className="mt-3 pt-3 border-t" style={{ borderColor: '#F0F0F0' }}>
+                  {(schoolGroups.length > 0 ? schoolGroups.filter(g => g.children.length > 0) : [{ school_id: null, school_name: 'All children', children: [] }]).map(g => (
+                    <div key={g.school_id || 'all'} className="flex items-center justify-between p-2.5 rounded-lg mb-2" style={{ backgroundColor: '#FAFAFA' }}>
                       <div>
                         <p className="text-xs font-semibold" style={{ color: '#333' }}>{g.school_name}</p>
-                        <p className="text-xs mt-0.5" style={{ color: '#888' }}>KSh {premiumPrice * Math.max(g.children.length, 1)} for {g.children.length} child{g.children.length === 1 ? '' : 'ren'}</p>
+                        <p className="text-xs mt-0.5" style={{ color: '#888' }}>KSh {premiumPrice * Math.max(g.children.length, 1)} per term</p>
                       </div>
                       <button onClick={() => handleUpgrade(g.school_id)} disabled={upgrading}
-                        className="btn-primary text-xs whitespace-nowrap" style={{ padding: '7px 12px', fontSize: 12 }}>
-                        {upgrading ? 'Processing...' : `Pay KSh ${premiumPrice * Math.max(g.children.length, 1)}`}
+                        className="btn-primary text-xs whitespace-nowrap" style={{ padding: '7px 14px', fontSize: 12 }}>
+                        {upgrading ? 'Processing...' : `Pay via M-Pesa`}
                       </button>
                     </div>
                   ))}
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: '#555' }}>M-Pesa number to charge</label>
+                  <input
+                    type="tel"
+                    value={renewalPhone}
+                    onChange={(e) => setRenewalPhone(e.target.value)}
+                    className="input-field mb-2"
+                    placeholder="2547XXXXXXXX"
+                  />
+                  <p className="text-xs" style={{ color: '#999' }}>
+                    One payment per term. No auto-renewal, no hidden charges. You will receive an M-Pesa prompt to confirm with your PIN.
+                  </p>
+                  {upgradeMsg && <p className="text-xs mt-2" style={{ color: upgradeMsg.includes('Failed') || upgradeMsg.includes('failed') ? '#C62828' : '#2E7D32' }}>{upgradeMsg}</p>}
                 </div>
               )}
-              <label className="block text-xs font-medium mb-1.5" style={{ color: '#555' }}>M-Pesa number to charge</label>
-              <input
-                type="tel"
-                value={renewalPhone}
-                onChange={(e) => setRenewalPhone(e.target.value)}
-                className="input-field mb-3"
-                placeholder="2547XXXXXXXX"
-              />
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center gap-1.5" style={{ color: '#555' }}><span style={{ color: '#10B981' }}>✓</span> Daily absence alerts</div>
-                <div className="flex items-center gap-1.5" style={{ color: '#555' }}><span style={{ color: '#10B981' }}>✓</span> 3+ day absence warnings</div>
-                <div className="flex items-center gap-1.5" style={{ color: '#555' }}><span style={{ color: '#10B981' }}>✓</span> Assessment results</div>
-                <div className="flex items-center gap-1.5" style={{ color: '#555' }}><span style={{ color: '#10B981' }}>✓</span> Fee balance reminders</div>
-                <div className="flex items-center gap-1.5" style={{ color: '#555' }}><span style={{ color: '#10B981' }}>✓</span> School broadcast messages</div>
-                <div className="flex items-center gap-1.5" style={{ color: '#555' }}><span style={{ color: '#10B981' }}>✓</span> All children covered</div>
-              </div>
-              {upgradeMsg && <p className="text-xs mt-2" style={{ color: upgradeMsg.includes('Failed') || upgradeMsg.includes('failed') ? '#C62828' : '#2E7D32' }}>{upgradeMsg}</p>}
             </div>
           ) : (
-            <div className="card p-4 mb-4" style={{ borderLeft: '4px solid #10B981' }}>
+            <div className="card p-4 mb-4" style={{ borderLeft: '4px solid #10B981', backgroundColor: '#F0FAF4' }}>
               <div className="flex items-center gap-2">
                 <span style={{ fontSize: 18 }}>✓</span>
                 <div>
-                  <p className="text-sm font-semibold" style={{ color: '#2E7D32' }}>Premium Active</p>
-                  {premiumExpires && <p className="text-xs" style={{ color: '#888' }}>Expires {new Date(premiumExpires).toLocaleDateString()}</p>}
+                  <p className="text-sm font-semibold" style={{ color: '#2E7D32' }}>Subscription Active</p>
+                  <p className="text-xs" style={{ color: '#888' }}>
+                    {premiumExpires ? `Active until ${new Date(premiumExpires).toLocaleDateString()}` : 'No expiry date'} — all features unlocked
+                  </p>
                 </div>
-              </div>
-              <div className="text-xs mt-2 pt-2 border-t" style={{ color: '#888', borderColor: '#F0F0F0' }}>
-                All WhatsApp alerts active for your children
               </div>
             </div>
           )}
@@ -413,12 +413,6 @@ export default function ParentPortal() {
                       <p className="text-xs" style={{ color: '#888' }}>{g.children.length} child{g.children.length === 1 ? '' : 'ren'}</p>
                     </div>
                   </div>
-                  {!isPremium && g.children.length > 0 && (
-                    <button onClick={() => handleUpgrade(g.school_id)} disabled={upgrading}
-                      className="btn-primary text-xs whitespace-nowrap" style={{ padding: '6px 10px', fontSize: 11 }}>
-                      {upgrading ? 'Processing...' : `Activate KSh ${premiumPrice * Math.max(g.children.length, 1)}`}
-                    </button>
-                  )}
                 </div>
 
                 {g.children.map(child => (
@@ -447,11 +441,21 @@ export default function ParentPortal() {
                       </div>
                     </div>
                     <div className="flex gap-2 mt-3 pt-3 border-t" style={{ borderColor: '#F0F0F0' }}>
-                      <button onClick={() => handleDownloadAcademic(child)} disabled={exporting} className="btn-secondary text-xs flex-1">
-                        Report PDF ({selectedTerm})
+                      <button
+                        onClick={() => handleDownloadAcademic(child)}
+                        disabled={exporting}
+                        className="btn-secondary text-xs flex-1"
+                        style={!isPremium ? { opacity: 0.55 } : undefined}
+                      >
+                        Report Card{!isPremium ? ' — Locked' : ` (${selectedTerm})`}
                       </button>
-                      <button onClick={() => handleDownloadFees(child)} disabled={exporting} className="btn-secondary text-xs flex-1">
-                        Fees PDF ({selectedTerm})
+                      <button
+                        onClick={() => handleDownloadFees(child)}
+                        disabled={exporting}
+                        className="btn-secondary text-xs flex-1"
+                        style={!isPremium ? { opacity: 0.55 } : undefined}
+                      >
+                        Fee Statement{!isPremium ? ' — Locked' : ` (${selectedTerm})`}
                       </button>
                     </div>
                   </div>
