@@ -88,4 +88,24 @@ export async function getPaymentStatus(checkoutRequestId, phone) {
   return data;
 }
 
+export async function searchMarketProducts(q, category) {
+  const { data } = await api.get('/api/market/products', { params: { q, category } });
+  return data;
+}
+
+export async function addMerchantProduct(body) {
+  const { data } = await api.post('/api/merchants/products', body);
+  return data;
+}
+
+export async function getMerchantProducts(merchantId) {
+  const { data } = await api.get('/api/merchants/products', { params: { merchant_id: merchantId } });
+  return data;
+}
+
+export async function deactivateMerchantProduct(merchantId, productId) {
+  const { data } = await api.post('/api/merchants/products/deactivate', { merchant_id: merchantId, product_id: productId });
+  return data;
+}
+
 export default api;

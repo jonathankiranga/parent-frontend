@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api, { registerMerchant, requestMerchantOtp, verifyMerchantOtp } from '../utils/api.js';
+import api, { registerMerchant, requestMerchantOtp, verifyMerchantOtp, addMerchantProduct, getMerchantProducts, deactivateMerchantProduct } from '../utils/api.js';
 
 export default function MerchantPortal({ phone: parentPhone, onBack }) {
   const [step, setStep] = useState('register');
@@ -16,10 +16,49 @@ export default function MerchantPortal({ phone: parentPhone, onBack }) {
   const [adMessage, setAdMessage] = useState('');
   const [campaigns, setCampaigns] = useState([]);
   const [msg, setMsg] = useState('');
+  const [products, setProducts] = useState([]);
+  const [prodForm, setProdForm] = useState({ name: '', category: 'Uniforms', price: '', description: '' });
+  const [prodMsg, setProdMsg] = useState('');
 
   useEffect(() => {
     api.get('/api/merchants/schools').then(d => setSchools((d.schools || []).map(s => ({ value: s.school_id, label: s.school_name })))).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (step === 'dashboard' && merchantId) {
+      getMerchantProducts(merchantId).then(d => setProducts(d.products || [])).catch(() => {});
+    }
+  }, [step, merchantId]);
+
+  async function handleAddProduct(e) {
+    e.preventDefault();
+    setLoading(true); setProdMsg('');
+    try {
+      await addMerchantProduct({
+        merchant_id: merchantId,
+        name: prodForm.name,
+        category: prodForm.category,
+        price: parseFloat(prodForm.price) || 0,
+        description: prodForm.description
+      });
+      setProdMsg('Listing published');
+      setProdForm({ name: '', category: prodForm.category, price: '', description: '' });
+      const d = await getMerchantProducts(merchantId);
+      setProducts(d.products || []);
+    } catch (err) {
+      setProdMsg(err.response?.data?.error || 'Failed to publish');
+    }
+    setLoading(false);
+  }
+
+  async function handleHideProduct(productId) {
+    try {
+      await deactivateMerchantProduct(merchantId, productId);
+      setProducts(ps => ps.map(p => p.product_id === productId ? { ...p, active: 0 } : p));
+    } catch (err) {
+      setProdMsg(err.response?.data?.error || 'Failed');
+    }
+  }
 
   async function handleRegister(e) {
     e.preventDefault();
@@ -143,6 +182,52 @@ export default function MerchantPortal({ phone: parentPhone, onBack }) {
               </table>
             </div>
           )}
+
+          <div className="card p-5 mt-4">
+            <h2 className="text-sm font-bold mb-1" style={{ color: '#333' }}>List a Product</h2>
+            <p className="text-xs mb-4" style={{ color: '#888' }}>Parents browse it in the School Market and call you directly. No fees.</p>
+            <form onSubmit={handleAddProduct} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>Product Name</label>
+                <input value={prodForm.name} onChange={e => setProdForm(f => ({ ...f, name: e.target.value }))} className="input-field" placeholder="e.g. Grade 1 sweater, maroon" required />
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>Category</label>
+                  <select value={prodForm.category} onChange={e => setProdForm(f => ({ ...f, category: e.target.value }))} className="input-field">
+                    {['Uniforms', 'Textbooks', 'Stationery', 'Transport', 'Tuition', 'Food', 'Other'].map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div style={{ width: 110 }}>
+                  <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>Price (KSh)</label>
+                  <input type="number" min="0" value={prodForm.price} onChange={e => setProdForm(f => ({ ...f, price: e.target.value }))} className="input-field" placeholder="1450" required />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>Description (optional)</label>
+                <textarea value={prodForm.description} onChange={e => setProdForm(f => ({ ...f, description: e.target.value }))} rows={2} className="input-field" placeholder="Sizes available, condition, collection point..." />
+              </div>
+              <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Publishing...' : 'Publish Listing'}</button>
+            </form>
+            {prodMsg && <p className="text-xs mt-2 text-center" style={{ color: prodMsg.includes('ail') ? '#C62828' : '#2E7D32' }}>{prodMsg}</p>}
+
+            {products.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <h3 className="text-xs font-bold uppercase tracking-wide" style={{ color: '#888' }}>Your Listings</h3>
+                {products.map(p => (
+                  <div key={p.product_id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg" style={{ backgroundColor: p.active ? '#FAFAFA' : '#F3F3F3' }}>
+                    <div className="min-w-0">
+                      <p className="text-sm truncate" style={{ color: p.active ? '#333' : '#999' }}>{p.name}</p>
+                      <p className="text-xs" style={{ color: '#888' }}>KSh {Number(p.price || 0).toLocaleString()} · {p.category}{p.active ? '' : ' · hidden'}</p>
+                    </div>
+                    {Boolean(p.active) && (
+                      <button onClick={() => handleHideProduct(p.product_id)} className="text-xs shrink-0" style={{ color: '#C62828' }}>Hide</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );

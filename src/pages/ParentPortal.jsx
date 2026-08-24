@@ -463,6 +463,19 @@ export default function ParentPortal() {
  
           <MarketplaceBanner schoolId={schoolGroups[0]?.school_id} />
 
+          <a href="#/market"
+            className="card p-4 flex items-center gap-3"
+            style={{ display: 'flex', textDecoration: 'none' }}>
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: '#F6F2FA' }}>
+              <span style={{ fontSize: 18 }}>🛍️</span>
+            </div>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: '#333' }}>School Market</p>
+              <p className="text-xs mt-0.5" style={{ color: '#888' }}>Uniforms, books & more from local sellers</p>
+            </div>
+            <span className="ml-auto" style={{ color: '#bbb' }}>→</span>
+          </a>
+
           <a href="#/merchant"
             className="card p-4 flex items-center gap-3"
             style={{ display: 'flex', textDecoration: 'none' }}>
