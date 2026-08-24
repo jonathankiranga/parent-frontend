@@ -66,8 +66,10 @@ export async function registerMerchant(body) {
   return data;
 }
 
-export async function requestMerchantOtp(phone) {
-  const { data } = await api.post('/api/merchants/request-otp', { phone });
+export async function requestMerchantOtp(identifier) {
+  const value = String(identifier || '').trim();
+  const body = value.includes('@') ? { email: value } : { phone: value };
+  const { data } = await api.post('/api/merchants/request-otp', body);
   return data;
 }
 

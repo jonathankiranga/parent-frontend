@@ -68,7 +68,19 @@ export default function MerchantPortal({ phone: parentPhone, onBack }) {
       setMerchantId(data.merchant_id);
       setSessionId(data.session_id);
       setStep('otp');
-    } catch (err) { setError(err.response?.data?.error || 'Failed'); }
+    } catch (err) {
+      const msgText = err.response?.data?.error || 'Failed';
+      setError(msgText);
+      if (msgText.includes('already registered')) {
+        // Returning merchant — send a login code instead
+        try {
+          const d = await requestMerchantOtp(phone.includes('@') || !phone ? email || phone : phone);
+          setSessionId(d.session_id);
+          setStep('otp');
+          setError('');
+        } catch (e2) { /* keep the 409 message */ }
+      }
+    }
     setLoading(false);
   }
 
@@ -260,6 +272,7 @@ export default function MerchantPortal({ phone: parentPhone, onBack }) {
               <div className="mb-3">
                 <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>Phone Number</label>
                 <input value={phone} onChange={e => setPhone(e.target.value)} className="input-field" placeholder="254712345678" required />
+                <p className="text-xs mt-1" style={{ color: '#999' }}>This is the number parents will see on your listings.</p>
               </div>
               <div className="mb-4">
                 <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>Email (optional)</label>
