@@ -89,7 +89,7 @@ export async function getPaymentStatus(checkoutRequestId, phone) {
 }
 
 export async function searchMarketProducts(q, category) {
-  const { data } = await api.get('/api/market/products', { params: { q, category } });
+  const { data } = await api.get('/api/merchants/market/products', { params: { q, category } });
   return data;
 }
 
