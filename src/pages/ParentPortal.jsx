@@ -263,6 +263,13 @@ export default function ParentPortal() {
     return String(name || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
   }
 
+  function fmtDate(value) {
+    if (!value) return '';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return String(value);
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
   if (step === 'dashboard') {
     const schoolGroups = buildSchoolGroups();
     return (
@@ -427,10 +434,10 @@ export default function ParentPortal() {
                           <span className={child.last_attendance === 'Present' ? 'badge-present' : 'badge-absent'}>
                             {child.last_attendance || 'No attendance yet'}
                           </span>
-                          {child.last_date && <span className="text-xs" style={{ color: '#bbb' }}>{child.last_date}</span>}
+                          {child.last_date && <span className="text-xs" style={{ color: '#bbb' }}>Last marked {fmtDate(child.last_date)}</span>}
                           {child.last_payment_amount && (
                             <span className="text-xs" style={{ color: '#888' }}>
-                              Paid KSh {child.last_payment_amount}{child.last_payment_date ? ` - ${child.last_payment_date}` : ''}
+                              Paid KSh {child.last_payment_amount}{child.last_payment_date ? ` on ${fmtDate(child.last_payment_date)}` : ''}
                             </span>
                           )}
                         </div>
