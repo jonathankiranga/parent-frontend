@@ -9,8 +9,6 @@ export default function MerchantPortal({ phone: parentPhone, onBack }) {
   const [merchantId, setMerchantId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [schools, setSchools] = useState([]);
-  const [targetSchool, setTargetSchool] = useState('');
   const [days, setDays] = useState(7);
   const [adMessage, setAdMessage] = useState('');
   const [campaigns, setCampaigns] = useState([]);
@@ -18,10 +16,6 @@ export default function MerchantPortal({ phone: parentPhone, onBack }) {
   const [products, setProducts] = useState([]);
   const [prodForm, setProdForm] = useState({ name: '', category: 'Uniforms', price: '', description: '' });
   const [prodMsg, setProdMsg] = useState('');
-
-  useEffect(() => {
-    api.get('/api/merchants/schools').then(d => setSchools((d.schools || []).map(s => ({ value: s.school_id, label: s.school_name })))).catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (step === 'dashboard' && merchantId) {
@@ -103,7 +97,7 @@ export default function MerchantPortal({ phone: parentPhone, onBack }) {
     e.preventDefault();
     setLoading(true); setMsg('');
     try {
-      const r = await api.post('/api/merchants/campaigns', { merchant_id: merchantId, message: adMessage, target_school_id: targetSchool, days });
+      const r = await api.post('/api/merchants/campaigns', { merchant_id: merchantId, message: adMessage, days });
       setMsg(r.data.message || 'Campaign created!');
       setAdMessage('');
       const d = await api.get('/api/merchants/campaigns', { params: { merchant_id: merchantId } });
@@ -140,19 +134,12 @@ export default function MerchantPortal({ phone: parentPhone, onBack }) {
         <div className="max-w-3xl mx-auto px-4 py-5 space-y-4">
           <div className="card p-4">
             <p className="text-sm font-semibold mb-1" style={{ color: '#333' }}>{businessName}</p>
-            <p className="text-xs" style={{ color: '#888' }}>Reach parents at your target school with sponsored ads</p>
+            <p className="text-xs" style={{ color: '#888' }}>Your ads run across all schools on the platform</p>
           </div>
 
           <div className="card p-5">
             <h2 className="text-sm font-bold mb-4" style={{ color: '#333' }}>New Campaign</h2>
             <form onSubmit={handleCreateAd} className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>Target School</label>
-                <select value={targetSchool} onChange={e => setTargetSchool(e.target.value)} className="input-field" required>
-                  <option value="">Select school</option>
-                  {schools.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                </select>
-              </div>
               <div>
                 <label className="block text-xs font-medium mb-1" style={{ color: '#555' }}>Ad Message</label>
                 <textarea value={adMessage} onChange={e => setAdMessage(e.target.value)} rows={2} className="input-field" placeholder="e.g. Mwangi Hardware — 10% off for parents" required />
