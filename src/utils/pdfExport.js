@@ -19,6 +19,49 @@ function cell(doc, text, x, y, w, h, opts = {}) {
   doc.text(lines.slice(0, maxLines), x + 1.5, ty);
 }
 
+function drawSummativeTable(doc, summative, x, y, maxW, pageH, levelLabel) {
+  const sessions = [];
+  const sessionKeys = new Set();
+  const subAreas = [];
+  const byCell = {};
+  summative.forEach((s) => {
+    if (!subAreas.includes(s.sub_area_name || '-')) subAreas.push(s.sub_area_name || '-');
+  });
+  summative.forEach((s) => {
+    const key = `${s.exam_type}|${s.exam_name || ''}`;
+    if (!sessionKeys.has(key)) { sessionKeys.add(key); sessions.push({ key, label: s.exam_type }); }
+    byCell[`${s.sub_area_name || '-'}|${key}`] = s;
+  });
+
+  const colSub = 46;
+  const n = sessions.length;
+  const colAssess = (maxW - colSub) / Math.max(1, n);
+  const rowH = 13;
+
+  doc.setFillColor(230, 230, 230);
+  doc.rect(x, y, maxW, 7, 'F');
+  cell(doc, 'Sub-area', x, y, colSub, 7, { bold: true, size: 7.5 });
+  sessions.forEach((se, i) => {
+    cell(doc, se.label, x + colSub + i * colAssess, y, colAssess, 7, { bold: true, size: 7.5 });
+  });
+  y += 7;
+
+  subAreas.forEach((sa) => {
+    if (y + rowH > pageH - 30) { doc.addPage(); y = 16; doc.setFillColor(230, 230, 230); doc.rect(x, y, maxW, 7, 'F'); cell(doc, 'Sub-area', x, y, colSub, 7, { bold: true, size: 7.5 }); sessions.forEach((se, i) => cell(doc, se.label, x + colSub + i * colAssess, y, colAssess, 7, { bold: true, size: 7.5 })); y += 7; }
+    cell(doc, sa, x, y, colSub, rowH, { size: 7.5 });
+    sessions.forEach((se, i) => {
+      const s = byCell[`${sa}|${se.key}`];
+      const cx = x + colSub + i * colAssess;
+      cell(doc, s ? s.summative_score || '-' : '-', cx, y, colAssess, s && s.performance_level ? 6 : rowH, { size: 7 });
+      if (s && s.performance_level) {
+        cell(doc, levelLabel(s.performance_level), cx, y + 6, colAssess, 7, { size: 6.5 });
+      }
+    });
+    y += rowH;
+  });
+  return y + 2;
+}
+
 export async function downloadAcademicPdf(report, childName, phone, term) {
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF();
@@ -151,26 +194,15 @@ export async function downloadAcademicPdf(report, childName, phone, term) {
         if (ry + 8 > pageH - 30) { doc.addPage(); ry = 16; }
         cell(doc, 'Summative (CAT / End-Term)', M, ry, W, 6, { bold: true, size: 7.5 });
         ry += 6;
-        summative.forEach((sm) => {
-          if (ry + 7 > pageH - 30) { doc.addPage(); ry = 16; }
-          cell(doc, `${sm.exam_type}: ${sm.exam_name || ''}`, M, ry, colStrand, 7, { size: 7.5 });
-          cell(doc, sm.sub_area_name || '', M + colStrand, ry, colSub, 7, { size: 7.5 });
-          cell(doc, sm.summative_score || '-', M + colStrand + colSub, ry, colMark, 7, { size: 7.5 });
-          cell(doc, levelLabel(sm.performance_level), M + colStrand + colSub + colMark, ry, colLevel, 7, { size: 7 });
-          ry += 7;
-        });
+        ry = drawSummativeTable(doc, summative, M, ry, W, pageH, levelLabel);
       }
       y = ry + 5;
     } else if (summative.length) {
       // Only CAT/End-Term data available
-      summative.forEach((sm) => {
-        if (y + 7 > pageH - 30) { doc.addPage(); y = 16; }
-        cell(doc, `${sm.exam_type}: ${sm.exam_name || ''}`, M, y, colStrand, 7, { size: 7.5 });
-        cell(doc, sm.sub_area_name || '', M + colStrand, y, colSub, 7, { size: 7.5 });
-        cell(doc, sm.summative_score || '-', M + colStrand + colSub, y, colMark, 7, { size: 7.5 });
-        cell(doc, levelLabel(sm.performance_level), M + colStrand + colSub + colMark, y, colLevel, 7, { size: 7 });
-        y += 7;
-      });
+      if (y + 8 > pageH - 30) { doc.addPage(); y = 16; }
+      cell(doc, 'Summative (CAT / End-Term)', M, y, W, 6, { bold: true, size: 7.5 });
+      y += 6;
+      y = drawSummativeTable(doc, summative, M, y, W, pageH, levelLabel);
       y += 5;
     }
 
