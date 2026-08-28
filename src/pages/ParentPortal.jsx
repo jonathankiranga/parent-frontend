@@ -26,6 +26,7 @@ export default function ParentPortal() {
   const [premiumTotal, setPremiumTotal] = useState(100);
   const [premiumCount, setPremiumCount] = useState(1);
   const [renewalPhone, setRenewalPhone] = useState('');
+  const [prepaidBalance, setPrepaidBalance] = useState(0);
 
   // Term selection — derive current term from month, one selector shared across all children
   function deriveCurrentTerm() {
@@ -53,6 +54,7 @@ export default function ParentPortal() {
       setPremiumPrice(data.premium_price || 100);
       setPremiumTotal(data.premium_total || 100);
       setPremiumCount(data.premium_children_count || (data.children?.length || 1));
+      setPrepaidBalance(data.prepaid_balance || 0);
       setRenewalPhone(saved);
       setStep('dashboard');
     }).catch(() => {
@@ -72,6 +74,7 @@ export default function ParentPortal() {
       if (!isEmail) {
         // Check premium status first to show renewal/locked UI at login
         const status = await getPremiumStatus(identifier);
+        setPrepaidBalance(status.prepaid_balance || 0);
         setPremiumPrice(status.premium_price || 100);
         setPremiumTotal(status.premium_total || 100);
         setPremiumCount(status.premium_children_count || 1);
@@ -125,6 +128,7 @@ export default function ParentPortal() {
       setPremiumPrice(data.premium_price || 100);
       setPremiumTotal(data.premium_total || 100);
       setPremiumCount(data.premium_children_count || (data.children?.length || 1));
+      setPrepaidBalance(data.prepaid_balance || 0);
       setPhone(effective);
       setRenewalPhone(effective);
       sessionStorage.setItem('parent_phone', effective); // persist across page refreshes
@@ -349,6 +353,13 @@ export default function ParentPortal() {
                   {showUpgrade ? 'Close' : 'Upgrade'}
                 </button>
               </div>
+              {prepaidBalance > 0 && (
+                <div className="mt-2 pt-2 border-t" style={{ borderColor: '#F0F0F0' }}>
+                  <p className="text-xs" style={{ color: '#7B4F9B' }}>
+                    Prepaid credit: KSh {Number(prepaidBalance).toLocaleString()} — automatically covers your next term(s).
+                  </p>
+                </div>
+              )}
               {showUpgrade && (
                 <div className="mt-3 pt-3 border-t" style={{ borderColor: '#F0F0F0' }}>
                   {(schoolGroups.length > 0 ? schoolGroups.filter(g => g.children.length > 0) : [{ school_id: null, school_name: 'All children', children: [] }]).map(g => (
@@ -386,6 +397,7 @@ export default function ParentPortal() {
                   <p className="text-sm font-semibold" style={{ color: '#2E7D32' }}>Subscription Active</p>
                   <p className="text-xs" style={{ color: '#888' }}>
                     {premiumExpires ? `Active until ${new Date(premiumExpires).toLocaleDateString()}` : 'No expiry date'} — all features unlocked
+                    {prepaidBalance > 0 ? ` · Prepaid credit KSh ${Number(prepaidBalance).toLocaleString()}` : ''}
                   </p>
                 </div>
               </div>
