@@ -165,7 +165,7 @@ export default function ParentPortal() {
           clearInterval(timer);
           setCheckoutRequestId(null);
           setUpgrading(false);
-          setUpgradeMsg('Payment was cancelled or failed. Try again.');
+          setUpgradeMsg(r.data.reason || 'Payment was cancelled or failed. Try again.');
         }
       } catch (e) { /* ignore poll errors */ }
 
