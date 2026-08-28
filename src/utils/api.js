@@ -61,6 +61,11 @@ export async function getFeeStatement(studentId, term, year) {
   return data;
 }
 
+export async function merchantAutoLogin(phone) {
+  const { data } = await api.post('/api/merchants/auto-login', { phone });
+  return data;
+}
+
 export async function registerMerchant(body) {
   const { data } = await api.post('/api/merchants/register', body);
   return data;

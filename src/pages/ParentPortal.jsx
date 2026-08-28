@@ -476,18 +476,32 @@ export default function ParentPortal() {
             <span className="ml-auto" style={{ color: '#bbb' }}>→</span>
           </a>
 
-          <a href="#/merchant"
-            className="card p-4 flex items-center gap-3"
-            style={{ display: 'flex', textDecoration: 'none' }}>
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: '#FFF3E0' }}>
-              <span style={{ fontSize: 18 }}>🛍️</span>
+          {isPremium ? (
+            <a href="#/merchant"
+              className="card p-4 flex items-center gap-3"
+              style={{ display: 'flex', textDecoration: 'none' }}>
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: '#FFF3E0' }}>
+                <span style={{ fontSize: 18 }}>🛍️</span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: '#333' }}>Sell on School Market</p>
+                <p className="text-xs mt-0.5" style={{ color: '#888' }}>List products, parents call you directly</p>
+              </div>
+              <span className="ml-auto" style={{ color: '#bbb' }}>→</span>
+            </a>
+          ) : (
+            <div className="card p-4 flex items-center gap-3" style={{ opacity: 0.6, cursor: 'not-allowed' }}
+              title="Available with an active subscription">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: '#F5F5F5' }}>
+                <span style={{ fontSize: 18 }}>🔒</span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: '#aaa' }}>Sell on School Market</p>
+                <p className="text-xs mt-0.5" style={{ color: '#bbb' }}>Available with an active subscription</p>
+              </div>
+              <span className="ml-auto" style={{ color: '#ddd' }}>🔒</span>
             </div>
-            <div>
-              <p className="text-sm font-semibold" style={{ color: '#333' }}>Sell on School Market</p>
-              <p className="text-xs mt-0.5" style={{ color: '#888' }}>List products, parents call you directly</p>
-            </div>
-            <span className="ml-auto" style={{ color: '#bbb' }}>→</span>
-          </a>
+          )}
           </div>
         </div>
       </div>
