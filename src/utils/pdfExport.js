@@ -8,15 +8,6 @@ function addWrappedText(doc, text, x, y, maxWidth, lineHeight = 6) {
   return y + (lines.length * lineHeight);
 }
 
-// CBC performance band from percentage score (KICD rubric)
-function cbcLevel(avgPct) {
-  const p = Number(avgPct) || 0;
-  if (p >= 76) return { code: 'EE', label: 'Exceeding Expectations', point: '4' };
-  if (p >= 51) return { code: 'ME', label: 'Meeting Expectations', point: '3' };
-  if (p >= 26) return { code: 'AE', label: 'Approaching Expectations', point: '2' };
-  return { code: 'BE', label: 'Below Expectations', point: '1' };
-}
-
 function cell(doc, text, x, y, w, h, opts = {}) {
   doc.rect(x, y, w, h);
   doc.setFont('helvetica', opts.bold ? 'bold' : 'normal');
@@ -90,49 +81,101 @@ export async function downloadAcademicPdf(report, childName, phone, term) {
   }
   y += 6;
 
-  // ---------- Performance table ----------
+  // ---------- Learning areas (standard KNEC CBC strand-level report) ----------
   doc.setDrawColor(60, 60, 60);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.text('LEARNING AREAS PERFORMANCE', M, y);
   y += 3;
 
-  const colArea = 74, colScore = 20, colLevel = 44, colRemark = W - colArea - colScore - colLevel;
-  const tableHeader = (ry) => {
+  const colStrand = 40, colSub = 40, colMark = 22, colLevel = W - colStrand - colSub - colMark;
+
+  const rowHeader = (ry) => {
     doc.setFillColor(230, 230, 230);
     doc.rect(M, ry, W, 7, 'F');
-    cell(doc, 'Learning Area', M, ry, colArea, 7, { bold: true, size: 8 });
-    cell(doc, 'Score (%)', M + colArea, ry, colScore, 7, { bold: true, size: 8 });
-    cell(doc, 'Performance Level', M + colArea + colScore, ry, colLevel, 7, { bold: true, size: 8 });
-    cell(doc, 'Assessment Levels Recorded', M + colArea + colScore + colLevel, ry, colRemark, 7, { bold: true, size: 8 });
+    cell(doc, 'Strand', M, ry, colStrand, 7, { bold: true, size: 7.5 });
+    cell(doc, 'Sub-strand', M + colStrand, ry, colSub, 7, { bold: true, size: 7.5 });
+    cell(doc, 'Mark', M + colStrand + colSub, ry, colMark, 7, { bold: true, size: 7.5 });
+    cell(doc, 'Competency Level', M + colStrand + colSub + colMark, ry, colLevel, 7, { bold: true, size: 7.5 });
   };
 
-  tableHeader(y);
-  let ry = y + 7;
-  areas.forEach((a) => {
-    const lvl = cbcLevel(a.avg_pct);
-    const remText = String(a.strand_summary || '-');
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    const remLines = doc.splitTextToSize(remText, colRemark - 3).slice(0, 3);
-    const rowHeight = Math.max(8, remLines.length * 4 + 4);
-    if (ry + rowHeight > pageH - 22) {
-      doc.addPage();
-      ry = 16;
-      tableHeader(ry);
-      ry += 7;
-    }
-    cell(doc, a.area_name, M, ry, colArea, rowHeight, { size: 8 });
-    cell(doc, `${a.avg_pct != null ? a.avg_pct : '-'}`, M + colArea, ry, colScore, rowHeight, { size: 8 });
-    cell(doc, `${lvl.code} (${lvl.point}) - ${lvl.label}`, M + colArea + colScore, ry, colLevel, rowHeight, { size: 7 });
-    cell(doc, remLines.join('\n'), M + colArea + colScore + colLevel, ry, colRemark, rowHeight, { size: 7, lineHeight: 4 });
-    ry += rowHeight;
-  });
-  if (areas.length === 0) {
-    cell(doc, 'No assessment data recorded for this term yet.', M, ry, W, 8, { size: 8 });
-    ry += 8;
+  const levelLabel = (lvl) => {
+    const map = { EE: 'E.E. - Exceeding Expectations', ME: 'M.E. - Meeting Expectations', AE: 'A.E. - Approaching Expectations', BE: 'B.E. - Below Expectations' };
+    return (lvl && map[lvl]) ? `${lvl} - ${map[lvl]}` : '-';
+  };
+
+  // Empty state
+  const hasData = areas.some(a => (a.strands && a.strands.length) || (a.summative && a.summative.length));
+  if (!hasData) {
+    cell(doc, 'No assessment data recorded for this term yet.', M, y, W, 8, { size: 8 });
+    y += 8;
   }
-  y = ry + 6;
+
+  areas.forEach((a) => {
+    const strands = a.strands || [];
+    const summative = a.summative || [];
+    if (!strands.length && !summative.length) {
+      // Learning area with no scores yet — still show as a blank row for completeness
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.text(String(a.area_name || '').toUpperCase(), M, y + 5.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      y += 7;
+    }
+
+    // Area title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text(String(a.area_name || '').toUpperCase(), M, y + 5);
+    y += 7;
+    if (y > pageH - 40) { doc.addPage(); y = 16; }
+
+    if (strands.length && strands.some(s => s.sub_strands && s.sub_strands.length)) {
+      rowHeader(y);
+      let ry = y + 7;
+      strands.forEach((s, si) => {
+        (s.sub_strands || []).forEach((sb) => {
+          if (ry + 7 > pageH - 30) { doc.addPage(); ry = 16; rowHeader(ry); ry += 7; }
+          cell(doc, si === 0 ? s.strand_name || '' : '', M, ry, colStrand, 7, { size: 7.5 });
+          if (si !== 0) cell(doc, '', M, ry, colStrand, 7, { size: 7.5 });
+          cell(doc, sb.sub_strand_name || '', M + colStrand, ry, colSub, 7, { size: 7.5 });
+          cell(doc, sb.formative_score || '-', M + colStrand + colSub, ry, colMark, 7, { size: 7.5 });
+          cell(doc, levelLabel(sb.performance_level), M + colStrand + colSub + colMark, ry, colLevel, 7, { size: 7 });
+          ry += 7;
+        });
+      });
+
+      // Summative (CAT / End-Term) section for this area
+      if (summative.length) {
+        if (ry + 8 > pageH - 30) { doc.addPage(); ry = 16; }
+        cell(doc, 'Summative (CAT / End-Term)', M, ry, W, 6, { bold: true, size: 7.5 });
+        ry += 6;
+        summative.forEach((sm) => {
+          if (ry + 7 > pageH - 30) { doc.addPage(); ry = 16; }
+          cell(doc, `${sm.exam_type}: ${sm.exam_name || ''}`, M, ry, colStrand, 7, { size: 7.5 });
+          cell(doc, sm.sub_area_name || '', M + colStrand, ry, colSub, 7, { size: 7.5 });
+          cell(doc, sm.summative_score || '-', M + colStrand + colSub, ry, colMark, 7, { size: 7.5 });
+          cell(doc, levelLabel(sm.performance_level), M + colStrand + colSub + colMark, ry, colLevel, 7, { size: 7 });
+          ry += 7;
+        });
+      }
+      y = ry + 5;
+    } else if (summative.length) {
+      // Only CAT/End-Term data available
+      summative.forEach((sm) => {
+        if (y + 7 > pageH - 30) { doc.addPage(); y = 16; }
+        cell(doc, `${sm.exam_type}: ${sm.exam_name || ''}`, M, y, colStrand, 7, { size: 7.5 });
+        cell(doc, sm.sub_area_name || '', M + colStrand, y, colSub, 7, { size: 7.5 });
+        cell(doc, sm.summative_score || '-', M + colStrand + colSub, y, colMark, 7, { size: 7.5 });
+        cell(doc, levelLabel(sm.performance_level), M + colStrand + colSub + colMark, y, colLevel, 7, { size: 7 });
+        y += 7;
+      });
+      y += 5;
+    }
+
+    if (y > pageH - 40) { doc.addPage(); y = 16; }
+  });
 
   // ---------- Key ----------
   if (y > pageH - 70) { doc.addPage(); y = 18; }
@@ -140,7 +183,7 @@ export async function downloadAcademicPdf(report, childName, phone, term) {
   doc.setFontSize(8.5);
   doc.text('KEY:', M, y + 4);
   doc.setFont('helvetica', 'normal');
-  doc.text('BE 0-25 Below Expectations    AE 26-50 Approaching    ME 51-75 Meeting    EE 76-100 Exceeding', M + 10, y + 4);
+  doc.text('KEY:  E.E. = Exceeding Expectations    M.E. = Meeting Expectations    A.E. = Approaching Expectations    B.E. = Below Expectations', M, y + 4);
   y += 10;
 
   // ---------- Remarks & signatures ----------
