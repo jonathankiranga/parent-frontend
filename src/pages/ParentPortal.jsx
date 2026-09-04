@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import OTPInput from '../components/OTPInput.jsx';
 import MarketplaceBanner from '../components/MarketplaceBanner.jsx';
+import InstallPrompt from '../components/InstallPrompt.jsx';
 import api, { requestParentOtp, verifyParentOtp, getParentDashboard, getAcademicReport, getFeeStatement, getPremiumStatus } from '../utils/api.js';
 
 export default function ParentPortal() {
@@ -303,7 +304,10 @@ export default function ParentPortal() {
               <h1 className="text-xl font-bold" style={{ color: '#333' }}>{parentName || 'Welcome'}</h1>
               <p className="text-xs mt-0.5" style={{ color: '#888' }}>{phone}</p>
             </div>
-            <button onClick={() => { sessionStorage.removeItem('parent_phone'); setStep('phone'); setPhone(''); setDashboard(null); }} className="btn-secondary text-xs">Logout</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <InstallPrompt />
+              <button onClick={() => { sessionStorage.removeItem('parent_phone'); setStep('phone'); setPhone(''); setDashboard(null); }} className="btn-secondary text-xs">Logout</button>
+            </div>
           </div>
 
           {/* Stats */}
