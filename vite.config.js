@@ -25,19 +25,8 @@ export default defineConfig({
           { src: 'icons/icon-512.svg', sizes: '512x512', type: 'image/svg+xml' }
         ]
       },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,json}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https?:\/\/.*\/api\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: { maxEntries: 100, maxAgeSeconds: 86400 },
-              networkTimeoutSeconds: 5
-            }
-          }
-        ]
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,svg,png,json}']
       }
     })
   ]
