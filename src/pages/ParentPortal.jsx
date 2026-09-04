@@ -157,14 +157,19 @@ export default function ParentPortal() {
           setRenewalRequired(false);
           setUpgrading(false);
           setUpgradeMsg('✓ Payment confirmed — subscription activated!');
-          // Refresh dashboard to get updated children
-          getParentDashboard(phone).then(data => {
-            setDashboard(data.children || []);
-            setSchoolsInfo(data.schools || []);
-            setParentName(data.parent?.parent_name || parentName);
-      setParentName(data.parent?.parent_name || '');
-            setPremiumExpires(data.parent?.premium_expires_at || null);
-          }).catch(() => {});
+          // Small delay so applyParentPayment on the backend finishes writing
+          // before we re-fetch the dashboard (avoids reading stale is_premium).
+          setTimeout(() => {
+            getParentDashboard(phone).then(data => {
+              setDashboard(data.children || []);
+              setSchoolsInfo(data.schools || []);
+              setParentName(prev => data.parent?.parent_name || prev);
+              setPremiumExpires(data.parent?.premium_expires_at || null);
+              setPrepaidBalance(data.prepaid_balance || 0);
+              setIsPremium(Boolean(data.premium_active));
+              setRenewalRequired(Boolean(data.renewal_required));
+            }).catch(() => {});
+          }, 2000);
         } else if (r.data.status === 'failed') {
           clearInterval(timer);
           setCheckoutRequestId(null);
