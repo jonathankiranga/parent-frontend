@@ -19,44 +19,48 @@ function cell(doc, text, x, y, w, h, opts = {}) {
   doc.text(lines.slice(0, maxLines), x + 1.5, ty);
 }
 
+function levelForAvg(pct) {
+  if (pct >= 80) return 'EE';
+  if (pct >= 60) return 'ME';
+  if (pct >= 40) return 'AE';
+  return 'BE';
+}
+
 function drawSummativeTable(doc, summative, x, y, maxW, pageH, levelLabel) {
-  const sessions = [];
-  const sessionKeys = new Set();
-  const subAreas = [];
-  const byCell = {};
+  // Per-term view: one Term Average column per sub-area (all sessions in the
+  // term are averaged). Parents get the term picture, not per-exam columns.
+  const bySub = new Map();
   summative.forEach((s) => {
-    if (!subAreas.includes(s.sub_area_name || '-')) subAreas.push(s.sub_area_name || '-');
+    const name = s.sub_area_name || '-';
+    if (!bySub.has(name)) bySub.set(name, []);
+    const m = /^([\d.]+)\/([\d.]+)$/.exec(String(s.summative_score || '').trim());
+    if (m && Number(m[2]) > 0) bySub.get(name).push((Number(m[1]) / Number(m[2])) * 100);
   });
-  summative.forEach((s) => {
-    const key = `${s.exam_type}|${s.exam_name || ''}`;
-    if (!sessionKeys.has(key)) { sessionKeys.add(key); sessions.push({ key, label: s.exam_type }); }
-    byCell[`${s.sub_area_name || '-'}|${key}`] = s;
-  });
+  const subAreas = Array.from(bySub.keys());
 
   const colSub = 46;
-  const n = sessions.length;
-  const colAssess = (maxW - colSub) / Math.max(1, n);
+  const colAssess = maxW - colSub;
   const rowH = 13;
 
-  doc.setFillColor(230, 230, 230);
-  doc.rect(x, y, maxW, 7, 'F');
-  cell(doc, 'Sub-area', x, y, colSub, 7, { bold: true, size: 7.5 });
-  sessions.forEach((se, i) => {
-    cell(doc, se.label, x + colSub + i * colAssess, y, colAssess, 7, { bold: true, size: 7.5 });
-  });
+  const header = (hy) => {
+    doc.setFillColor(230, 230, 230);
+    doc.rect(x, hy, maxW, 7, 'F');
+    cell(doc, 'Sub-area', x, hy, colSub, 7, { bold: true, size: 7.5 });
+    cell(doc, 'Term Average', x + colSub, hy, colAssess, 7, { bold: true, size: 7.5 });
+  };
+  header(y);
   y += 7;
 
   subAreas.forEach((sa) => {
-    if (y + rowH > pageH - 30) { doc.addPage(); y = 16; doc.setFillColor(230, 230, 230); doc.rect(x, y, maxW, 7, 'F'); cell(doc, 'Sub-area', x, y, colSub, 7, { bold: true, size: 7.5 }); sessions.forEach((se, i) => cell(doc, se.label, x + colSub + i * colAssess, y, colAssess, 7, { bold: true, size: 7.5 })); y += 7; }
+    if (y + rowH > pageH - 30) { doc.addPage(); y = 16; header(y); y += 7; }
+    const pcts = bySub.get(sa) || [];
+    const avg = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length * 10) / 10 : null;
+    const lvl = avg === null ? null : levelForAvg(avg);
     cell(doc, sa, x, y, colSub, rowH, { size: 7.5 });
-    sessions.forEach((se, i) => {
-      const s = byCell[`${sa}|${se.key}`];
-      const cx = x + colSub + i * colAssess;
-      cell(doc, s ? s.summative_score || '-' : '-', cx, y, colAssess, s && s.performance_level ? 6 : rowH, { size: 7 });
-      if (s && s.performance_level) {
-        cell(doc, levelLabel(s.performance_level), cx, y + 6, colAssess, 7, { size: 6.5 });
-      }
-    });
+    cell(doc, avg === null ? '-' : `${avg}%`, x + colSub, y, colAssess, lvl ? 6 : rowH, { size: 7 });
+    if (lvl) {
+      cell(doc, levelLabel(lvl), x + colSub, y + 6, colAssess, 7, { size: 6.5 });
+    }
     y += rowH;
   });
   return y + 2;
@@ -189,10 +193,10 @@ export async function downloadAcademicPdf(report, childName, phone, term) {
         });
       });
 
-      // Summative (CAT / End-Term) section for this area
+      // Term Average (CAT / End-Term) section for this area
       if (summative.length) {
         if (ry + 8 > pageH - 30) { doc.addPage(); ry = 16; }
-        cell(doc, 'Summative (CAT / End-Term)', M, ry, W, 6, { bold: true, size: 7.5 });
+        cell(doc, 'Term Average (CAT / End-Term)', M, ry, W, 6, { bold: true, size: 7.5 });
         ry += 6;
         ry = drawSummativeTable(doc, summative, M, ry, W, pageH, levelLabel);
       }
@@ -200,7 +204,7 @@ export async function downloadAcademicPdf(report, childName, phone, term) {
     } else if (summative.length) {
       // Only CAT/End-Term data available
       if (y + 8 > pageH - 30) { doc.addPage(); y = 16; }
-      cell(doc, 'Summative (CAT / End-Term)', M, y, W, 6, { bold: true, size: 7.5 });
+      cell(doc, 'Term Average (CAT / End-Term)', M, y, W, 6, { bold: true, size: 7.5 });
       y += 6;
       y = drawSummativeTable(doc, summative, M, y, W, pageH, levelLabel);
       y += 5;
