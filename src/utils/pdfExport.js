@@ -19,7 +19,12 @@ function cell(doc, text, x, y, w, h, opts = {}) {
   doc.text(lines.slice(0, maxLines), x + 1.5, ty);
 }
 
-function levelForAvg(pct) {
+const LEVEL_ORDER = { EE: 4, ME: 3, AE: 2, BE: 1 };
+function dominantLevel(levels) {
+  if (!levels || levels.length === 0) return null;
+  return levels.reduce((best, l) => (LEVEL_ORDER[l] || 0) > (LEVEL_ORDER[best] || 0) ? l : best);
+}
+function levelForPct(pct) {
   if (pct >= 80) return 'EE';
   if (pct >= 60) return 'ME';
   if (pct >= 40) return 'AE';
@@ -27,14 +32,17 @@ function levelForAvg(pct) {
 }
 
 function drawSummativeTable(doc, summative, x, y, maxW, pageH, levelLabel) {
-  // Per-term view: one Term Average column per sub-area (all sessions in the
-  // term are averaged). Parents get the term picture, not per-exam columns.
+  // Per-term view: one level per sub-area — the highest recorded level across
+  // the term's sessions (CBC reports levels, never averages).
   const bySub = new Map();
   summative.forEach((s) => {
     const name = s.sub_area_name || '-';
     if (!bySub.has(name)) bySub.set(name, []);
-    const m = /^([\d.]+)\/([\d.]+)$/.exec(String(s.summative_score || '').trim());
-    if (m && Number(m[2]) > 0) bySub.get(name).push((Number(m[1]) / Number(m[2])) * 100);
+    if (s.performance_level) bySub.get(name).push(s.performance_level);
+    else {
+      const m = /^([\d.]+)\/([\d.]+)$/.exec(String(s.summative_score || '').trim());
+      if (m && Number(m[2]) > 0) bySub.get(name).push(levelForPct((Number(m[1]) / Number(m[2])) * 100));
+    }
   });
   const subAreas = Array.from(bySub.keys());
 
@@ -46,18 +54,16 @@ function drawSummativeTable(doc, summative, x, y, maxW, pageH, levelLabel) {
     doc.setFillColor(230, 230, 230);
     doc.rect(x, hy, maxW, 7, 'F');
     cell(doc, 'Sub-area', x, hy, colSub, 7, { bold: true, size: 7.5 });
-    cell(doc, 'Term Average', x + colSub, hy, colAssess, 7, { bold: true, size: 7.5 });
+    cell(doc, 'Term Level', x + colSub, hy, colAssess, 7, { bold: true, size: 7.5 });
   };
   header(y);
   y += 7;
 
   subAreas.forEach((sa) => {
     if (y + rowH > pageH - 30) { doc.addPage(); y = 16; header(y); y += 7; }
-    const pcts = bySub.get(sa) || [];
-    const avg = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length * 10) / 10 : null;
-    const lvl = avg === null ? null : levelForAvg(avg);
+    const lvl = dominantLevel(bySub.get(sa) || []);
     cell(doc, sa, x, y, colSub, rowH, { size: 7.5 });
-    cell(doc, avg === null ? '-' : `${avg}%`, x + colSub, y, colAssess, lvl ? 6 : rowH, { size: 7 });
+    cell(doc, lvl || '-', x + colSub, y, colAssess, lvl ? 6 : rowH, { size: 7 });
     if (lvl) {
       cell(doc, levelLabel(lvl), x + colSub, y + 6, colAssess, 7, { size: 6.5 });
     }
@@ -193,10 +199,10 @@ export async function downloadAcademicPdf(report, childName, phone, term) {
         });
       });
 
-      // Term Average (CAT / End-Term) section for this area
+      // Term Level (CAT / End-Term) section for this area
       if (summative.length) {
         if (ry + 8 > pageH - 30) { doc.addPage(); ry = 16; }
-        cell(doc, 'Term Average (CAT / End-Term)', M, ry, W, 6, { bold: true, size: 7.5 });
+        cell(doc, 'Term Level (CAT / End-Term)', M, ry, W, 6, { bold: true, size: 7.5 });
         ry += 6;
         ry = drawSummativeTable(doc, summative, M, ry, W, pageH, levelLabel);
       }
@@ -204,7 +210,7 @@ export async function downloadAcademicPdf(report, childName, phone, term) {
     } else if (summative.length) {
       // Only CAT/End-Term data available
       if (y + 8 > pageH - 30) { doc.addPage(); y = 16; }
-      cell(doc, 'Term Average (CAT / End-Term)', M, y, W, 6, { bold: true, size: 7.5 });
+      cell(doc, 'Term Level (CAT / End-Term)', M, y, W, 6, { bold: true, size: 7.5 });
       y += 6;
       y = drawSummativeTable(doc, summative, M, y, W, pageH, levelLabel);
       y += 5;
