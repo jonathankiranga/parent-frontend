@@ -1,9 +1,38 @@
 import axios from 'axios';
 
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://sms-backend-r0tn.onrender.com';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://sms-backend-r0tn.onrender.com',
-  timeout: 10000,
+  baseURL: BASE_URL,
+  timeout: 90000,
   headers: { 'Content-Type': 'application/json' }
+});
+
+let _serverReady = false;
+async function waitForServer() {
+  if (_serverReady) return true;
+  const deadline = Date.now() + 70000;
+  while (Date.now() < deadline) {
+    try {
+      const r = await axios.get(`${BASE_URL}/health`, { timeout: 5000 });
+      if (r.data?.status === 'ok') { _serverReady = true; return true; }
+    } catch { /* still waking */ }
+    await new Promise(r => setTimeout(r, 3000));
+  }
+  return false;
+}
+
+api.interceptors.response.use(undefined, async (error) => {
+  const config = error.config;
+  const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+  const isNetwork = error.code === 'ERR_NETWORK' || error.response == null;
+  if (config && config._retried !== true && (isTimeout || isNetwork)) {
+    config._retried = true;
+    _serverReady = false;
+    await waitForServer();
+    return api.request(config);
+  }
+  return Promise.reject(error);
 });
 
 export async function requestParentOtp(identifier) {
