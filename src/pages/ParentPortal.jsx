@@ -310,6 +310,7 @@ export default function ParentPortal() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <InstallPrompt />
+              <button onClick={() => navigate('/help')} className="btn-ghost text-xs" aria-label="Help">❓</button>
               <button onClick={() => { sessionStorage.removeItem('parent_phone'); setStep('phone'); setPhone(''); setDashboard(null); setCheckoutRequestId(null); setUpgrading(false); setUpgradeMsg(''); }} className="btn-secondary text-xs">Logout</button>
             </div>
           </div>
@@ -569,6 +570,12 @@ export default function ParentPortal() {
           </div>
           <h1 className="text-2xl font-bold text-white">Parent Portal</h1>
           <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.7)' }}>Powered by Smarternow Data Venture</p>
+        </div>
+
+        <div className="text-center mb-4">
+          <button onClick={() => navigate('/help')} style={{ color: 'rgba(255,255,255,0.85)', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 8, padding: '6px 14px', fontSize: 13, cursor: 'pointer' }}>
+            ❓ Help &amp; Guide
+          </button>
         </div>
 
         <div className="bg-white rounded-card p-6 shadow-xl">
