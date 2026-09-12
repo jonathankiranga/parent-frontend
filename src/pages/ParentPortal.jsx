@@ -232,7 +232,7 @@ export default function ParentPortal() {
     try {
       const report = await getAcademicReport(child.student_id, selectedTerm, selectedYear, phone);
       const module = await import('../utils/pdfExport.js');
-      await module.downloadAcademicPdf(report, child.full_name, phone, selectedTerm);
+      await module.downloadAcademicPdf(report, child.full_name, phone, selectedTerm, selectedYear);
     } catch (err) {
       setPdfNotice(err.response?.data?.error || 'Failed to generate academic report');
     }
@@ -306,7 +306,7 @@ export default function ParentPortal() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <InstallPrompt />
-              <button onClick={() => { sessionStorage.removeItem('parent_phone'); setStep('phone'); setPhone(''); setDashboard(null); }} className="btn-secondary text-xs">Logout</button>
+              <button onClick={() => { sessionStorage.removeItem('parent_phone'); setStep('phone'); setPhone(''); setDashboard(null); setCheckoutRequestId(null); setUpgrading(false); setUpgradeMsg(''); }} className="btn-secondary text-xs">Logout</button>
             </div>
           </div>
 
@@ -358,7 +358,7 @@ export default function ParentPortal() {
                   <p className="text-sm font-semibold" style={{ color: '#333' }}>Free plan</p>
                   <p className="text-xs mt-0.5" style={{ color: '#888' }}>Viewing your children's fees is free. Report cards and WhatsApp alerts come with a subscription.</p>
                 </div>
-                <button onClick={() => setShowUpgrade(s => !s)} className="btn-secondary text-xs whitespace-nowrap">
+                <button onClick={() => { setShowUpgrade(s => !s); setUpgradeMsg(''); }} className="btn-secondary text-xs whitespace-nowrap">
                   {showUpgrade ? 'Close' : 'Upgrade'}
                 </button>
               </div>
@@ -452,6 +452,15 @@ export default function ParentPortal() {
                           <span className="badge-present whitespace-nowrap">{child.class_name}</span>
                         </div>
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          {child.last_attendance && (
+                            <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                              style={{
+                                backgroundColor: child.last_attendance === 'Present' ? '#E8F5E9' : '#FFEBEE',
+                                color: child.last_attendance === 'Present' ? '#2E7D32' : '#C62828'
+                              }}>
+                              {child.last_attendance}{child.last_date ? ` · ${fmtDate(child.last_date)}` : ''}
+                            </span>
+                          )}
                           {child.last_payment_amount && (
                             <span className="text-xs" style={{ color: '#888' }}>
                               Paid KSh {child.last_payment_amount}{child.last_payment_date ? ` on ${fmtDate(child.last_payment_date)}` : ''}

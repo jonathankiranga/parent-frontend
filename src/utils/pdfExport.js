@@ -72,7 +72,7 @@ function drawSummativeTable(doc, summative, x, y, maxW, pageH, levelLabel) {
   return y + 2;
 }
 
-export async function downloadAcademicPdf(report, childName, phone, term) {
+export async function downloadAcademicPdf(report, childName, phone, term, year) {
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF();
   const pageW = doc.internal.pageSize.width;
@@ -109,7 +109,7 @@ export async function downloadAcademicPdf(report, childName, phone, term) {
   doc.rect(M, y, W, 8, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
-  doc.text(`STUDENT REPORT CARD - ${String(term).toUpperCase()} ${report?.year || new Date().getFullYear()}`, pageW / 2, y + 5.6, { align: 'center' });
+  doc.text(`STUDENT REPORT CARD - ${String(term).toUpperCase()} ${year || report?.year || new Date().getFullYear()}`, pageW / 2, y + 5.6, { align: 'center' });
   y += 12;
 
   // ---------- Learner particulars ----------
