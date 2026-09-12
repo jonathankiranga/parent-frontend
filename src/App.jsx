@@ -13,7 +13,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/parent" replace />} />
         <Route path="/parent" element={<ParentPortal />} />
-        <Route path="/merchant" element={<MerchantPortal onBack={() => navigate('/parent')} phone={sessionStorage.getItem('parent_phone') || ''} />} />
+        <Route path="/merchant" element={<MerchantPortal onBack={() => navigate('/parent')} phone={sessionStorage.getItem('parent_phone') || ''} key={sessionStorage.getItem('parent_phone') || 'no-phone'} />} />
         <Route path="/market" element={<MarketPage onBack={() => navigate('/parent')} />} />
         <Route path="/help" element={<HelpPage />} />
       </Routes>

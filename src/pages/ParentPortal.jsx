@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import OTPInput from '../components/OTPInput.jsx';
 import MarketplaceBanner from '../components/MarketplaceBanner.jsx';
 import InstallPrompt from '../components/InstallPrompt.jsx';
 import api, { requestParentOtp, verifyParentOtp, getParentDashboard, getAcademicReport, getFeeStatement, getPremiumStatus } from '../utils/api.js';
 
 export default function ParentPortal() {
+  const navigate = useNavigate();
   const [phone, setPhone] = useState('');
   const [step, setStep] = useState('phone');
   const [loading, setLoading] = useState(false);
@@ -28,6 +30,7 @@ export default function ParentPortal() {
   const [premiumCount, setPremiumCount] = useState(1);
   const [renewalPhone, setRenewalPhone] = useState('');
   const [prepaidBalance, setPrepaidBalance] = useState(0);
+  const [restoring, setRestoring] = useState(true);
 
   // Term selection — derive current term from month, one selector shared across all children
   function deriveCurrentTerm() {
@@ -42,7 +45,7 @@ export default function ParentPortal() {
   // Restore session on page load/refresh
   useEffect(() => {
     const saved = sessionStorage.getItem('parent_phone');
-    if (!saved) return;
+    if (!saved) { setRestoring(false); return; }
     setPhone(saved);
     getParentDashboard(saved).then(data => {
       setDashboard(data.children || []);
@@ -59,8 +62,9 @@ export default function ParentPortal() {
       setRenewalPhone(saved);
       setStep('dashboard');
     }).catch(() => {
-      // Session stale or server error — clear and show login
       sessionStorage.removeItem('parent_phone');
+    }).finally(() => {
+      setRestoring(false);
     });
   }, []);
 
@@ -493,9 +497,9 @@ export default function ParentPortal() {
  
           <MarketplaceBanner schoolId={schoolGroups[0]?.school_id} />
 
-          <a href="#/market"
-            className="card p-4 flex items-center gap-3"
-            style={{ display: 'flex', textDecoration: 'none' }}>
+          <button onClick={() => navigate('/market')}
+            className="card p-4 flex items-center gap-3 w-full text-left"
+            style={{ display: 'flex', textDecoration: 'none', cursor: 'pointer' }}>
             <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: '#F6F2FA' }}>
               <span style={{ fontSize: 18 }}>🛍️</span>
             </div>
@@ -504,12 +508,12 @@ export default function ParentPortal() {
               <p className="text-xs mt-0.5" style={{ color: '#888' }}>Uniforms, books & more from local sellers</p>
             </div>
             <span className="ml-auto" style={{ color: '#bbb' }}>→</span>
-          </a>
+          </button>
 
           {isPremium ? (
-            <a href="#/merchant"
-              className="card p-4 flex items-center gap-3"
-              style={{ display: 'flex', textDecoration: 'none' }}>
+            <button onClick={() => navigate('/merchant')}
+              className="card p-4 flex items-center gap-3 w-full text-left"
+              style={{ display: 'flex', textDecoration: 'none', cursor: 'pointer' }}>
               <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: '#FFF3E0' }}>
                 <span style={{ fontSize: 18 }}>🛍️</span>
               </div>
@@ -518,7 +522,7 @@ export default function ParentPortal() {
                 <p className="text-xs mt-0.5" style={{ color: '#888' }}>List products, parents call you directly</p>
               </div>
               <span className="ml-auto" style={{ color: '#bbb' }}>→</span>
-            </a>
+            </button>
           ) : (
             <div className="card p-4 flex items-center gap-3" style={{ opacity: 0.6, cursor: 'not-allowed' }}
               title="Available with an active subscription">
@@ -534,6 +538,18 @@ export default function ParentPortal() {
           )}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (restoring) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8F8F8' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid #7B4F9B', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
+          <p style={{ fontSize: 13, color: '#888' }}>Loading…</p>
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
