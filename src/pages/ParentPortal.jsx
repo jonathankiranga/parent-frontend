@@ -63,6 +63,7 @@ export default function ParentPortal() {
       setStep('dashboard');
     }).catch(() => {
       sessionStorage.removeItem('parent_phone');
+      sessionStorage.removeItem('parent_session_id');
     }).finally(() => {
       setRestoring(false);
     });
@@ -311,7 +312,7 @@ export default function ParentPortal() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <InstallPrompt />
               <button onClick={() => navigate('/help')} className="btn-ghost text-xs" aria-label="Help">❓</button>
-              <button onClick={() => { sessionStorage.removeItem('parent_phone'); setStep('phone'); setPhone(''); setDashboard(null); setCheckoutRequestId(null); setUpgrading(false); setUpgradeMsg(''); }} className="btn-secondary text-xs">Logout</button>
+              <button onClick={() => { sessionStorage.removeItem('parent_phone'); sessionStorage.removeItem('parent_session_id'); setStep('phone'); setPhone(''); setDashboard(null); setCheckoutRequestId(null); setUpgrading(false); setUpgradeMsg(''); }} className="btn-secondary text-xs">Logout</button>
             </div>
           </div>
 
@@ -599,7 +600,7 @@ export default function ParentPortal() {
               <p className="text-sm mb-1 text-center" style={{ color: '#666' }}>Enter the code sent to</p>
               <p className="text-base font-semibold mb-5 text-center" style={{ color: '#7B4F9B' }}>{phone}</p>
               <OTPInput onComplete={handleVerify} />
-              <button onClick={() => { setStep('phone'); setError(''); }} className="w-full mt-3 text-center text-sm" style={{ color: '#888' }}>← Change number</button>
+              <button onClick={() => { sessionStorage.removeItem('parent_session_id'); setStep('phone'); setError(''); }} className="w-full mt-3 text-center text-sm" style={{ color: '#888' }}>← Change number</button>
             </div>
           )}
         </div>

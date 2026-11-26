@@ -8,6 +8,16 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' }
 });
 
+// Attach the verified parent OTP session to protected parent API requests.
+api.interceptors.request.use((config) => {
+  const sessionId = sessionStorage.getItem('parent_session_id');
+  if (sessionId) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${sessionId}`;
+  }
+  return config;
+});
+
 let _serverReady = false;
 async function waitForServer() {
   if (_serverReady) return true;
@@ -44,6 +54,9 @@ export async function requestParentOtp(identifier) {
 
 export async function verifyParentOtp(session_id, code) {
   const { data } = await api.post('/api/parents/verify-otp', { session_id, code });
+  if (data.verified && data.session_id) {
+    sessionStorage.setItem('parent_session_id', data.session_id);
+  }
   return data;
 }
 
