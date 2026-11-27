@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import OTPInput from '../components/OTPInput.jsx';
 import MarketplaceBanner from '../components/MarketplaceBanner.jsx';
 import InstallPrompt from '../components/InstallPrompt.jsx';
-import api, { requestParentOtp, verifyParentOtp, getParentDashboard, getAcademicReport, getFeeStatement, getPremiumStatus } from '../utils/api.js';
+import api, { requestParentOtp, verifyParentOtp, getAcademicReport, getFeeStatement, getParentAccountDashboard } from '../utils/api.js';
 
 export default function ParentPortal() {
   const navigate = useNavigate();
@@ -25,7 +25,7 @@ export default function ParentPortal() {
   const [pdfNotice, setPdfNotice] = useState('');
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [premiumPrice, setPremiumPrice] = useState(100);
+  const [premiumPrice, setPremiumPrice] = useState(200);
   const [premiumTotal, setPremiumTotal] = useState(100);
   const [premiumCount, setPremiumCount] = useState(1);
   const [renewalPhone, setRenewalPhone] = useState('');
@@ -42,12 +42,22 @@ export default function ParentPortal() {
   const [selectedTerm, setSelectedTerm] = useState(deriveCurrentTerm);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
+  async function loadParentDashboard() {
+    return getParentAccountDashboard();
+  }
+
   // Restore session on page load/refresh
   useEffect(() => {
     const saved = sessionStorage.getItem('parent_phone');
-    if (!saved) { setRestoring(false); return; }
+    const savedSession = sessionStorage.getItem('parent_session_id');
+    if (!saved || !savedSession) {
+      sessionStorage.removeItem('parent_phone');
+      sessionStorage.removeItem('parent_account_id');
+      setRestoring(false);
+      return;
+    }
     setPhone(saved);
-    getParentDashboard(saved).then(data => {
+    loadParentDashboard().then(data => {
       setDashboard(data.children || []);
       setSchoolId(data.school_id);
       setSchoolsInfo(data.schools || []);
@@ -55,15 +65,19 @@ export default function ParentPortal() {
       setIsPremium(Boolean(data.premium_active));
       setRenewalRequired(Boolean(data.renewal_required));
       setPremiumExpires(data.parent?.premium_expires_at || null);
-      setPremiumPrice(data.premium_price || 100);
-      setPremiumTotal(data.premium_total || 100);
+      setPremiumPrice(data.premium_price || 200);
+      setPremiumTotal(data.premium_total || 200);
       setPremiumCount(data.premium_children_count || (data.children?.length || 1));
       setPrepaidBalance(data.prepaid_balance || 0);
       setRenewalPhone(saved);
       setStep('dashboard');
-    }).catch(() => {
+    }).catch(err => {
       sessionStorage.removeItem('parent_phone');
       sessionStorage.removeItem('parent_session_id');
+      sessionStorage.removeItem('parent_account_id');
+      setError(err.response?.data?.error === 'Global parent account migration is required'
+        ? 'Please sign in again to activate your consolidated family account.'
+        : 'Your session has expired. Please sign in again.');
     }).finally(() => {
       setRestoring(false);
     });
@@ -71,49 +85,21 @@ export default function ParentPortal() {
 
   async function handleRequestOtp(e) {
     e.preventDefault();
+    const identifier = phone.trim();
+    if (!identifier) return;
     setLoading(true);
     setError('');
     try {
-      const identifier = phone.trim();
-      const isEmail = identifier.includes('@');
-
-      if (!isEmail) {
-        // Check premium status first to show renewal/locked UI at login
-        const status = await getPremiumStatus(identifier);
-        setPrepaidBalance(status.prepaid_balance || 0);
-        setPremiumPrice(status.premium_price || 100);
-        setPremiumTotal(status.premium_total || 100);
-        setPremiumCount(status.premium_children_count || 1);
-        setRenewalPhone(identifier);
-
-        if (status.registered === false) {
-          // Phone not registered as a parent — show helpful message with next steps
-          setError('This phone number is not registered as a parent in the system. Please contact the school or support to link your children.');
-          setLoading(false);
-          return;
-        }
-
-        if (status.renewal_required) {
-          // Show pay wall but still allow them to proceed to OTP so they can pay from dashboard
-          setRenewalRequired(true);
-          // Still send OTP so they can log in and pay from within the dashboard
-          const data = await requestParentOtp(identifier);
-          setSessionId(data.session_id);
-          setStep('otp');
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Email logins skip the pre-check — the backend resolves the email
-      // to the registered parent profile after OTP verification.
+      // Parent authentication is global: no school is selected before OTP.
+      // The backend resolves the verified email/phone to the consolidated account.
       const data = await requestParentOtp(identifier);
       setSessionId(data.session_id);
       setStep('otp');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to send OTP');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   async function handleVerify(code) {
@@ -123,7 +109,7 @@ export default function ParentPortal() {
       const v = await verifyParentOtp(sessionId, code);
       // Email logins resolve to the profile's canonical phone server-side
       const effective = v.phone || phone.trim();
-      const data = await getParentDashboard(effective);
+      const data = await loadParentDashboard();
       setDashboard(data.children || []);
       setSchoolId(data.school_id);
       setSchoolsInfo(data.schools || []);
@@ -137,6 +123,7 @@ export default function ParentPortal() {
       setPrepaidBalance(data.prepaid_balance || 0);
       setPhone(effective);
       setRenewalPhone(effective);
+      if (v.parent_account_id) sessionStorage.setItem('parent_account_id', String(v.parent_account_id));
       sessionStorage.setItem('parent_phone', effective); // persist across page refreshes
       setStep('dashboard');
     } catch (err) {
@@ -166,7 +153,7 @@ export default function ParentPortal() {
           // Small delay so applyParentPayment on the backend finishes writing
           // before we re-fetch the dashboard (avoids reading stale is_premium).
           setTimeout(() => {
-            getParentDashboard(phone).then(data => {
+            loadParentDashboard().then(data => {
               setDashboard(data.children || []);
               setSchoolsInfo(data.schools || []);
               setParentName(prev => data.parent?.parent_name || prev);
@@ -176,6 +163,11 @@ export default function ParentPortal() {
               setRenewalRequired(Boolean(data.renewal_required));
             }).catch(() => {});
           }, 2000);
+        } else if (r.data.status === 'paid_unapplied') {
+          clearInterval(timer);
+          setCheckoutRequestId(null);
+          setUpgrading(false);
+          setUpgradeMsg(r.data.message || 'Payment received. The school needs to reconcile your subscription before access is activated.');
         } else if (r.data.status === 'failed') {
           clearInterval(timer);
           setCheckoutRequestId(null);
@@ -200,15 +192,19 @@ export default function ParentPortal() {
     try {
       const targetPhone = (renewalPhone || phone).trim();
       const r = await api.post('/api/parents/upgrade', { phone: targetPhone, school_id: schoolId || undefined });
-      if (r.data.status === 'confirmed') {
-        // Simulated / dev mode — immediate
-        setIsPremium(true);
-        setRenewalRequired(false);
-        setPremiumTotal(r.data.premium_due || premiumTotal);
-        const expires = new Date();
-        expires.setMonth(expires.getMonth() + 4);
-        setPremiumExpires(expires.toISOString());
-        setUpgradeMsg('✓ Subscription activated');
+      if (r.data.status === 'prepaid_activated' || r.data.status === 'confirmed') {
+        // Refresh school-scoped entitlements after prepaid or simulated activation.
+        const data = await loadParentDashboard();
+        setDashboard(data.children || []);
+        setSchoolsInfo(data.schools || []);
+        setParentName(prev => data.parent?.parent_name || prev);
+        setIsPremium(Boolean(data.premium_active));
+        setRenewalRequired(Boolean(data.renewal_required));
+        setPremiumTotal(data.premium_total || 0);
+        setPrepaidBalance(data.prepaid_balance || 0);
+        setUpgradeMsg(r.data.status === 'prepaid_activated'
+          ? '✓ Prepaid balance applied — subscription activated'
+          : '✓ Subscription activated');
         setUpgrading(false);
       } else if (r.data.status === 'school_paid') {
         setIsPremium(true);
@@ -228,8 +224,8 @@ export default function ParentPortal() {
   }
 
   async function handleDownloadAcademic(child) {
-    if (!isPremium) {
-      setPdfNotice('Report cards are available with an active subscription. Tap Upgrade above to activate.');
+    if (!child.premium_active) {
+      setPdfNotice('This child’s school does not have an active subscription. Select that school in the subscription section to activate access.');
       return;
     }
     setExporting(true);
@@ -262,10 +258,10 @@ export default function ParentPortal() {
     const groups = [];
     const ensure = (id, name) => {
       let g = groups.find(x => x.school_id === id);
-      if (!g) { g = { school_id: id, school_name: name || 'My School', children: [] }; groups.push(g); }
+      if (!g) { g = { school_id: id, school_name: name || 'My School', children: [], premium_active: false }; groups.push(g); }
       return g;
     };
-    (schoolsInfo || []).forEach(s => ensure(s.school_id, s.school_name));
+    (schoolsInfo || []).forEach(s => { const g = ensure(s.school_id, s.school_name); g.premium_active = Boolean(s.premium_active); });
     (dashboard || []).forEach(child => {
       const info = (schoolsInfo || []).find(s => s.school_id === child.school_id);
       const g = ensure(child.school_id, child.school_name || (info ? info.school_name : ''));
@@ -312,7 +308,7 @@ export default function ParentPortal() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <InstallPrompt />
               <button onClick={() => navigate('/help')} className="btn-ghost text-xs" aria-label="Help">❓</button>
-              <button onClick={() => { sessionStorage.removeItem('parent_phone'); sessionStorage.removeItem('parent_session_id'); setStep('phone'); setPhone(''); setDashboard(null); setCheckoutRequestId(null); setUpgrading(false); setUpgradeMsg(''); }} className="btn-secondary text-xs">Logout</button>
+              <button onClick={() => { sessionStorage.removeItem('parent_phone'); sessionStorage.removeItem('parent_session_id'); sessionStorage.removeItem('parent_account_id'); setStep('phone'); setPhone(''); setDashboard(null); setCheckoutRequestId(null); setUpgrading(false); setUpgradeMsg(''); }} className="btn-secondary text-xs">Logout</button>
             </div>
           </div>
 
@@ -377,7 +373,7 @@ export default function ParentPortal() {
               )}
               {showUpgrade && (
                 <div className="mt-3 pt-3 border-t" style={{ borderColor: '#F0F0F0' }}>
-                  {(schoolGroups.length > 0 ? schoolGroups.filter(g => g.children.length > 0) : [{ school_id: null, school_name: 'All children', children: [] }]).map(g => (
+                  {(schoolGroups.length > 0 ? schoolGroups.filter(g => g.children.length > 0 && !g.premium_active) : [{ school_id: null, school_name: 'All children', children: [] }]).map(g => (
                     <div key={g.school_id || 'all'} className="flex items-center justify-between p-2.5 rounded-lg mb-2" style={{ backgroundColor: '#FAFAFA' }}>
                       <div>
                         <p className="text-xs font-semibold" style={{ color: '#333' }}>{g.school_name}</p>
@@ -475,23 +471,29 @@ export default function ParentPortal() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-2 mt-3 pt-3 border-t" style={{ borderColor: '#F0F0F0' }}>
-                      <button
-                        onClick={() => handleDownloadAcademic(child)}
-                        disabled={exporting}
-                        className="btn-secondary text-xs flex-1"
-                        style={!isPremium ? { opacity: 0.55 } : undefined}
-                      >
-                        Report Card{!isPremium ? ' — Locked' : ` (${selectedTerm})`}
-                      </button>
-                      <button
-                        onClick={() => handleDownloadFees(child)}
-                        disabled={exporting}
-                        className="btn-secondary text-xs flex-1"
-                      >
-                        Fee Statement ({selectedTerm})
-                      </button>
-                    </div>
+                    {(child.can_view_results !== false || child.can_view_fees !== false) && (
+                      <div className="flex gap-2 mt-3 pt-3 border-t" style={{ borderColor: '#F0F0F0' }}>
+                        {child.can_view_results !== false && (
+                          <button
+                            onClick={() => handleDownloadAcademic(child)}
+                            disabled={exporting}
+                            className="btn-secondary text-xs flex-1"
+                            style={!child.premium_active ? { opacity: 0.55 } : undefined}
+                          >
+                            Report Card{!child.premium_active ? ' — Locked' : ` (${selectedTerm})`}
+                          </button>
+                        )}
+                        {child.can_view_fees !== false && (
+                          <button
+                            onClick={() => handleDownloadFees(child)}
+                            disabled={exporting}
+                            className="btn-secondary text-xs flex-1"
+                          >
+                            Fee Statement ({selectedTerm})
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -600,7 +602,7 @@ export default function ParentPortal() {
               <p className="text-sm mb-1 text-center" style={{ color: '#666' }}>Enter the code sent to</p>
               <p className="text-base font-semibold mb-5 text-center" style={{ color: '#7B4F9B' }}>{phone}</p>
               <OTPInput onComplete={handleVerify} />
-              <button onClick={() => { sessionStorage.removeItem('parent_session_id'); setStep('phone'); setError(''); }} className="w-full mt-3 text-center text-sm" style={{ color: '#888' }}>← Change number</button>
+              <button onClick={() => { sessionStorage.removeItem('parent_session_id'); sessionStorage.removeItem('parent_account_id'); setStep('phone'); setError(''); }} className="w-full mt-3 text-center text-sm" style={{ color: '#888' }}>← Change number</button>
             </div>
           )}
         </div>
