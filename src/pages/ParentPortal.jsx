@@ -192,8 +192,8 @@ export default function ParentPortal() {
     try {
       const targetPhone = (renewalPhone || phone).trim();
       const r = await api.post('/api/parents/upgrade', { phone: targetPhone, school_id: schoolId || undefined });
-      if (r.data.status === 'confirmed') {
-        // Simulated / dev mode — refresh school-scoped entitlements from the backend.
+      if (r.data.status === 'prepaid_activated' || r.data.status === 'confirmed') {
+        // Refresh school-scoped entitlements after prepaid or simulated activation.
         const data = await loadParentDashboard();
         setDashboard(data.children || []);
         setSchoolsInfo(data.schools || []);
@@ -202,7 +202,9 @@ export default function ParentPortal() {
         setRenewalRequired(Boolean(data.renewal_required));
         setPremiumTotal(data.premium_total || 0);
         setPrepaidBalance(data.prepaid_balance || 0);
-        setUpgradeMsg('✓ Subscription activated');
+        setUpgradeMsg(r.data.status === 'prepaid_activated'
+          ? '✓ Prepaid balance applied — subscription activated'
+          : '✓ Subscription activated');
         setUpgrading(false);
       } else if (r.data.status === 'school_paid') {
         setIsPremium(true);
