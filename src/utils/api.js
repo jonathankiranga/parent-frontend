@@ -60,6 +60,11 @@ export async function verifyParentOtp(session_id, code) {
   return data;
 }
 
+export async function getParentAccountDashboard() {
+  const { data } = await api.get('/api/parents/account-dashboard');
+  return data;
+}
+
 export async function getParentDashboard(phone, schoolId) {
   const params = schoolId ? { school_id: schoolId } : {};
   const { data } = await api.get(`/api/parents/dashboard/${encodeURIComponent(phone)}`, { params });
