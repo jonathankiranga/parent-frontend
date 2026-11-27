@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import OTPInput from '../components/OTPInput.jsx';
 import MarketplaceBanner from '../components/MarketplaceBanner.jsx';
 import InstallPrompt from '../components/InstallPrompt.jsx';
-import api, { requestParentOtp, verifyParentOtp, getParentDashboard, getAcademicReport, getFeeStatement, getPremiumStatus } from '../utils/api.js';
+import api, { requestParentOtp, verifyParentOtp, getParentDashboard, getAcademicReport, getFeeStatement, getPremiumStatus, getParentAccountDashboard } from '../utils/api.js';
 
 export default function ParentPortal() {
   const navigate = useNavigate();
@@ -42,12 +42,35 @@ export default function ParentPortal() {
   const [selectedTerm, setSelectedTerm] = useState(deriveCurrentTerm);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
+  async function loadParentDashboard(parentPhone) {
+    const legacy = await getParentDashboard(parentPhone);
+    try {
+      const family = await getParentAccountDashboard();
+      return {
+        ...legacy,
+        ...family,
+        parent: { ...(legacy.parent || {}), ...(family.parent || {}) },
+        premium_active: legacy.premium_active,
+        renewal_required: legacy.renewal_required,
+        premium_price: legacy.premium_price,
+        premium_total: legacy.premium_total,
+        premium_children_count: legacy.premium_children_count,
+        prepaid_balance: legacy.prepaid_balance,
+        school_pays: legacy.school_pays
+      };
+    } catch (err) {
+      // Existing sessions remain usable during the staged rollout; the
+      // consolidated view becomes available after the identity migration.
+      return legacy;
+    }
+  }
+
   // Restore session on page load/refresh
   useEffect(() => {
     const saved = sessionStorage.getItem('parent_phone');
     if (!saved) { setRestoring(false); return; }
     setPhone(saved);
-    getParentDashboard(saved).then(data => {
+    loadParentDashboard(saved).then(data => {
       setDashboard(data.children || []);
       setSchoolId(data.school_id);
       setSchoolsInfo(data.schools || []);
@@ -123,7 +146,7 @@ export default function ParentPortal() {
       const v = await verifyParentOtp(sessionId, code);
       // Email logins resolve to the profile's canonical phone server-side
       const effective = v.phone || phone.trim();
-      const data = await getParentDashboard(effective);
+      const data = await loadParentDashboard(effective);
       setDashboard(data.children || []);
       setSchoolId(data.school_id);
       setSchoolsInfo(data.schools || []);
@@ -137,6 +160,7 @@ export default function ParentPortal() {
       setPrepaidBalance(data.prepaid_balance || 0);
       setPhone(effective);
       setRenewalPhone(effective);
+      if (v.parent_account_id) sessionStorage.setItem('parent_account_id', String(v.parent_account_id));
       sessionStorage.setItem('parent_phone', effective); // persist across page refreshes
       setStep('dashboard');
     } catch (err) {
@@ -166,7 +190,7 @@ export default function ParentPortal() {
           // Small delay so applyParentPayment on the backend finishes writing
           // before we re-fetch the dashboard (avoids reading stale is_premium).
           setTimeout(() => {
-            getParentDashboard(phone).then(data => {
+            loadParentDashboard(phone).then(data => {
               setDashboard(data.children || []);
               setSchoolsInfo(data.schools || []);
               setParentName(prev => data.parent?.parent_name || prev);
@@ -312,7 +336,7 @@ export default function ParentPortal() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <InstallPrompt />
               <button onClick={() => navigate('/help')} className="btn-ghost text-xs" aria-label="Help">❓</button>
-              <button onClick={() => { sessionStorage.removeItem('parent_phone'); sessionStorage.removeItem('parent_session_id'); setStep('phone'); setPhone(''); setDashboard(null); setCheckoutRequestId(null); setUpgrading(false); setUpgradeMsg(''); }} className="btn-secondary text-xs">Logout</button>
+              <button onClick={() => { sessionStorage.removeItem('parent_phone'); sessionStorage.removeItem('parent_session_id'); sessionStorage.removeItem('parent_account_id'); setStep('phone'); setPhone(''); setDashboard(null); setCheckoutRequestId(null); setUpgrading(false); setUpgradeMsg(''); }} className="btn-secondary text-xs">Logout</button>
             </div>
           </div>
 
