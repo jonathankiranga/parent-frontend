@@ -52,10 +52,10 @@ export default function ParentPortal() {
         parent: { ...(legacy.parent || {}), ...(family.parent || {}) },
         premium_active: family.premium_active ?? legacy.premium_active,
         renewal_required: family.premium_active !== undefined ? !family.premium_active : legacy.renewal_required,
-        premium_price: legacy.premium_price,
-        premium_total: legacy.premium_total,
-        premium_children_count: legacy.premium_children_count,
-        prepaid_balance: legacy.prepaid_balance,
+        premium_price: family.premium_price ?? legacy.premium_price,
+        premium_total: family.premium_total ?? legacy.premium_total,
+        premium_children_count: family.premium_children_count ?? legacy.premium_children_count,
+        prepaid_balance: family.prepaid_balance ?? legacy.prepaid_balance,
         school_pays: legacy.school_pays
       };
     } catch (err) {
