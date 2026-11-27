@@ -467,23 +467,29 @@ export default function ParentPortal() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-2 mt-3 pt-3 border-t" style={{ borderColor: '#F0F0F0' }}>
-                      <button
-                        onClick={() => handleDownloadAcademic(child)}
-                        disabled={exporting}
-                        className="btn-secondary text-xs flex-1"
-                        style={!child.premium_active ? { opacity: 0.55 } : undefined}
-                      >
-                        Report Card{!child.premium_active ? ' — Locked' : ` (${selectedTerm})`}
-                      </button>
-                      <button
-                        onClick={() => handleDownloadFees(child)}
-                        disabled={exporting}
-                        className="btn-secondary text-xs flex-1"
-                      >
-                        Fee Statement ({selectedTerm})
-                      </button>
-                    </div>
+                    {(child.can_view_results !== false || child.can_view_fees !== false) && (
+                      <div className="flex gap-2 mt-3 pt-3 border-t" style={{ borderColor: '#F0F0F0' }}>
+                        {child.can_view_results !== false && (
+                          <button
+                            onClick={() => handleDownloadAcademic(child)}
+                            disabled={exporting}
+                            className="btn-secondary text-xs flex-1"
+                            style={!child.premium_active ? { opacity: 0.55 } : undefined}
+                          >
+                            Report Card{!child.premium_active ? ' — Locked' : ` (${selectedTerm})`}
+                          </button>
+                        )}
+                        {child.can_view_fees !== false && (
+                          <button
+                            onClick={() => handleDownloadFees(child)}
+                            disabled={exporting}
+                            className="btn-secondary text-xs flex-1"
+                          >
+                            Fee Statement ({selectedTerm})
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
