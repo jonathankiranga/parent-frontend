@@ -50,8 +50,8 @@ export default function ParentPortal() {
         ...legacy,
         ...family,
         parent: { ...(legacy.parent || {}), ...(family.parent || {}) },
-        premium_active: legacy.premium_active,
-        renewal_required: legacy.renewal_required,
+        premium_active: family.premium_active ?? legacy.premium_active,
+        renewal_required: family.premium_active !== undefined ? !family.premium_active : legacy.renewal_required,
         premium_price: legacy.premium_price,
         premium_total: legacy.premium_total,
         premium_children_count: legacy.premium_children_count,
@@ -252,8 +252,8 @@ export default function ParentPortal() {
   }
 
   async function handleDownloadAcademic(child) {
-    if (!isPremium) {
-      setPdfNotice('Report cards are available with an active subscription. Tap Upgrade above to activate.');
+    if (!child.premium_active) {
+      setPdfNotice('This child’s school does not have an active subscription. Select that school in the subscription section to activate access.');
       return;
     }
     setExporting(true);
@@ -504,9 +504,9 @@ export default function ParentPortal() {
                         onClick={() => handleDownloadAcademic(child)}
                         disabled={exporting}
                         className="btn-secondary text-xs flex-1"
-                        style={!isPremium ? { opacity: 0.55 } : undefined}
+                        style={!child.premium_active ? { opacity: 0.55 } : undefined}
                       >
-                        Report Card{!isPremium ? ' — Locked' : ` (${selectedTerm})`}
+                        Report Card{!child.premium_active ? ' — Locked' : ` (${selectedTerm})`}
                       </button>
                       <button
                         onClick={() => handleDownloadFees(child)}
