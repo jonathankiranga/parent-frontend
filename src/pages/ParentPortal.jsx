@@ -286,10 +286,10 @@ export default function ParentPortal() {
     const groups = [];
     const ensure = (id, name) => {
       let g = groups.find(x => x.school_id === id);
-      if (!g) { g = { school_id: id, school_name: name || 'My School', children: [] }; groups.push(g); }
+      if (!g) { g = { school_id: id, school_name: name || 'My School', children: [], premium_active: false }; groups.push(g); }
       return g;
     };
-    (schoolsInfo || []).forEach(s => ensure(s.school_id, s.school_name));
+    (schoolsInfo || []).forEach(s => { const g = ensure(s.school_id, s.school_name); g.premium_active = Boolean(s.premium_active); });
     (dashboard || []).forEach(child => {
       const info = (schoolsInfo || []).find(s => s.school_id === child.school_id);
       const g = ensure(child.school_id, child.school_name || (info ? info.school_name : ''));
@@ -401,7 +401,7 @@ export default function ParentPortal() {
               )}
               {showUpgrade && (
                 <div className="mt-3 pt-3 border-t" style={{ borderColor: '#F0F0F0' }}>
-                  {(schoolGroups.length > 0 ? schoolGroups.filter(g => g.children.length > 0) : [{ school_id: null, school_name: 'All children', children: [] }]).map(g => (
+                  {(schoolGroups.length > 0 ? schoolGroups.filter(g => g.children.length > 0 && !g.premium_active) : [{ school_id: null, school_name: 'All children', children: [] }]).map(g => (
                     <div key={g.school_id || 'all'} className="flex items-center justify-between p-2.5 rounded-lg mb-2" style={{ backgroundColor: '#FAFAFA' }}>
                       <div>
                         <p className="text-xs font-semibold" style={{ color: '#333' }}>{g.school_name}</p>
