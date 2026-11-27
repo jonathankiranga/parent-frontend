@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import OTPInput from '../components/OTPInput.jsx';
 import MarketplaceBanner from '../components/MarketplaceBanner.jsx';
 import InstallPrompt from '../components/InstallPrompt.jsx';
-import api, { requestParentOtp, verifyParentOtp, getParentDashboard, getAcademicReport, getFeeStatement, getParentAccountDashboard } from '../utils/api.js';
+import api, { requestParentOtp, verifyParentOtp, getAcademicReport, getFeeStatement, getParentAccountDashboard } from '../utils/api.js';
 
 export default function ParentPortal() {
   const navigate = useNavigate();
