@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import OTPInput from '../components/OTPInput.jsx';
 import MarketplaceBanner from '../components/MarketplaceBanner.jsx';
 import InstallPrompt from '../components/InstallPrompt.jsx';
-import api, { requestParentOtp, verifyParentOtp, getParentDashboard, getAcademicReport, getFeeStatement, getPremiumStatus, getParentAccountDashboard } from '../utils/api.js';
+import api, { requestParentOtp, verifyParentOtp, getParentDashboard, getAcademicReport, getFeeStatement, getParentAccountDashboard } from '../utils/api.js';
 
 export default function ParentPortal() {
   const navigate = useNavigate();
@@ -25,7 +25,7 @@ export default function ParentPortal() {
   const [pdfNotice, setPdfNotice] = useState('');
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [premiumPrice, setPremiumPrice] = useState(100);
+  const [premiumPrice, setPremiumPrice] = useState(200);
   const [premiumTotal, setPremiumTotal] = useState(100);
   const [premiumCount, setPremiumCount] = useState(1);
   const [renewalPhone, setRenewalPhone] = useState('');
@@ -43,32 +43,28 @@ export default function ParentPortal() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   async function loadParentDashboard(parentPhone) {
-    const legacy = await getParentDashboard(parentPhone);
     try {
-      const family = await getParentAccountDashboard();
-      return {
-        ...legacy,
-        ...family,
-        parent: { ...(legacy.parent || {}), ...(family.parent || {}) },
-        premium_active: family.premium_active ?? legacy.premium_active,
-        renewal_required: family.premium_active !== undefined ? !family.premium_active : legacy.renewal_required,
-        premium_price: family.premium_price ?? legacy.premium_price,
-        premium_total: family.premium_total ?? legacy.premium_total,
-        premium_children_count: family.premium_children_count ?? legacy.premium_children_count,
-        prepaid_balance: family.prepaid_balance ?? legacy.prepaid_balance,
-        school_pays: legacy.school_pays
-      };
+      // The global account endpoint is authoritative after the identity migration.
+      return await getParentAccountDashboard();
     } catch (err) {
-      // Existing sessions remain usable during the staged rollout; the
-      // consolidated view becomes available after the identity migration.
-      return legacy;
+      // Preserve older sessions only while they are waiting to be migrated.
+      const migrationPending = err.response?.status === 403 &&
+        err.response?.data?.error === 'Global parent account migration is required';
+      if (!migrationPending) throw err;
+      return getParentDashboard(parentPhone);
     }
   }
 
   // Restore session on page load/refresh
   useEffect(() => {
     const saved = sessionStorage.getItem('parent_phone');
-    if (!saved) { setRestoring(false); return; }
+    const savedSession = sessionStorage.getItem('parent_session_id');
+    if (!saved || !savedSession) {
+      sessionStorage.removeItem('parent_phone');
+      sessionStorage.removeItem('parent_account_id');
+      setRestoring(false);
+      return;
+    }
     setPhone(saved);
     loadParentDashboard(saved).then(data => {
       setDashboard(data.children || []);
@@ -78,8 +74,8 @@ export default function ParentPortal() {
       setIsPremium(Boolean(data.premium_active));
       setRenewalRequired(Boolean(data.renewal_required));
       setPremiumExpires(data.parent?.premium_expires_at || null);
-      setPremiumPrice(data.premium_price || 100);
-      setPremiumTotal(data.premium_total || 100);
+      setPremiumPrice(data.premium_price || 200);
+      setPremiumTotal(data.premium_total || 200);
       setPremiumCount(data.premium_children_count || (data.children?.length || 1));
       setPrepaidBalance(data.prepaid_balance || 0);
       setRenewalPhone(saved);
@@ -94,49 +90,21 @@ export default function ParentPortal() {
 
   async function handleRequestOtp(e) {
     e.preventDefault();
+    const identifier = phone.trim();
+    if (!identifier) return;
     setLoading(true);
     setError('');
     try {
-      const identifier = phone.trim();
-      const isEmail = identifier.includes('@');
-
-      if (!isEmail) {
-        // Check premium status first to show renewal/locked UI at login
-        const status = await getPremiumStatus(identifier);
-        setPrepaidBalance(status.prepaid_balance || 0);
-        setPremiumPrice(status.premium_price || 100);
-        setPremiumTotal(status.premium_total || 100);
-        setPremiumCount(status.premium_children_count || 1);
-        setRenewalPhone(identifier);
-
-        if (status.registered === false) {
-          // Phone not registered as a parent — show helpful message with next steps
-          setError('This phone number is not registered as a parent in the system. Please contact the school or support to link your children.');
-          setLoading(false);
-          return;
-        }
-
-        if (status.renewal_required) {
-          // Show pay wall but still allow them to proceed to OTP so they can pay from dashboard
-          setRenewalRequired(true);
-          // Still send OTP so they can log in and pay from within the dashboard
-          const data = await requestParentOtp(identifier);
-          setSessionId(data.session_id);
-          setStep('otp');
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Email logins skip the pre-check — the backend resolves the email
-      // to the registered parent profile after OTP verification.
+      // Parent authentication is global: no school is selected before OTP.
+      // The backend resolves the verified email/phone to the consolidated account.
       const data = await requestParentOtp(identifier);
       setSessionId(data.session_id);
       setStep('otp');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to send OTP');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   async function handleVerify(code) {
@@ -624,7 +592,7 @@ export default function ParentPortal() {
               <p className="text-sm mb-1 text-center" style={{ color: '#666' }}>Enter the code sent to</p>
               <p className="text-base font-semibold mb-5 text-center" style={{ color: '#7B4F9B' }}>{phone}</p>
               <OTPInput onComplete={handleVerify} />
-              <button onClick={() => { sessionStorage.removeItem('parent_session_id'); setStep('phone'); setError(''); }} className="w-full mt-3 text-center text-sm" style={{ color: '#888' }}>← Change number</button>
+              <button onClick={() => { sessionStorage.removeItem('parent_session_id'); sessionStorage.removeItem('parent_account_id'); setStep('phone'); setError(''); }} className="w-full mt-3 text-center text-sm" style={{ color: '#888' }}>← Change number</button>
             </div>
           )}
         </div>
