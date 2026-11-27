@@ -163,6 +163,11 @@ export default function ParentPortal() {
               setRenewalRequired(Boolean(data.renewal_required));
             }).catch(() => {});
           }, 2000);
+        } else if (r.data.status === 'paid_unapplied') {
+          clearInterval(timer);
+          setCheckoutRequestId(null);
+          setUpgrading(false);
+          setUpgradeMsg(r.data.message || 'Payment received. The school needs to reconcile your subscription before access is activated.');
         } else if (r.data.status === 'failed') {
           clearInterval(timer);
           setCheckoutRequestId(null);
@@ -188,13 +193,15 @@ export default function ParentPortal() {
       const targetPhone = (renewalPhone || phone).trim();
       const r = await api.post('/api/parents/upgrade', { phone: targetPhone, school_id: schoolId || undefined });
       if (r.data.status === 'confirmed') {
-        // Simulated / dev mode — immediate
-        setIsPremium(true);
-        setRenewalRequired(false);
-        setPremiumTotal(r.data.premium_due || premiumTotal);
-        const expires = new Date();
-        expires.setMonth(expires.getMonth() + 4);
-        setPremiumExpires(expires.toISOString());
+        // Simulated / dev mode — refresh school-scoped entitlements from the backend.
+        const data = await loadParentDashboard();
+        setDashboard(data.children || []);
+        setSchoolsInfo(data.schools || []);
+        setParentName(prev => data.parent?.parent_name || prev);
+        setIsPremium(Boolean(data.premium_active));
+        setRenewalRequired(Boolean(data.renewal_required));
+        setPremiumTotal(data.premium_total || 0);
+        setPrepaidBalance(data.prepaid_balance || 0);
         setUpgradeMsg('✓ Subscription activated');
         setUpgrading(false);
       } else if (r.data.status === 'school_paid') {
