@@ -42,17 +42,8 @@ export default function ParentPortal() {
   const [selectedTerm, setSelectedTerm] = useState(deriveCurrentTerm);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
-  async function loadParentDashboard(parentPhone) {
-    try {
-      // The global account endpoint is authoritative after the identity migration.
-      return await getParentAccountDashboard();
-    } catch (err) {
-      // Preserve older sessions only while they are waiting to be migrated.
-      const migrationPending = err.response?.status === 403 &&
-        err.response?.data?.error === 'Global parent account migration is required';
-      if (!migrationPending) throw err;
-      return getParentDashboard(parentPhone);
-    }
+  async function loadParentDashboard() {
+    return getParentAccountDashboard();
   }
 
   // Restore session on page load/refresh
@@ -66,7 +57,7 @@ export default function ParentPortal() {
       return;
     }
     setPhone(saved);
-    loadParentDashboard(saved).then(data => {
+    loadParentDashboard().then(data => {
       setDashboard(data.children || []);
       setSchoolId(data.school_id);
       setSchoolsInfo(data.schools || []);
@@ -80,9 +71,13 @@ export default function ParentPortal() {
       setPrepaidBalance(data.prepaid_balance || 0);
       setRenewalPhone(saved);
       setStep('dashboard');
-    }).catch(() => {
+    }).catch(err => {
       sessionStorage.removeItem('parent_phone');
       sessionStorage.removeItem('parent_session_id');
+      sessionStorage.removeItem('parent_account_id');
+      setError(err.response?.data?.error === 'Global parent account migration is required'
+        ? 'Please sign in again to activate your consolidated family account.'
+        : 'Your session has expired. Please sign in again.');
     }).finally(() => {
       setRestoring(false);
     });
@@ -114,7 +109,7 @@ export default function ParentPortal() {
       const v = await verifyParentOtp(sessionId, code);
       // Email logins resolve to the profile's canonical phone server-side
       const effective = v.phone || phone.trim();
-      const data = await loadParentDashboard(effective);
+      const data = await loadParentDashboard();
       setDashboard(data.children || []);
       setSchoolId(data.school_id);
       setSchoolsInfo(data.schools || []);
@@ -158,7 +153,7 @@ export default function ParentPortal() {
           // Small delay so applyParentPayment on the backend finishes writing
           // before we re-fetch the dashboard (avoids reading stale is_premium).
           setTimeout(() => {
-            loadParentDashboard(phone).then(data => {
+            loadParentDashboard().then(data => {
               setDashboard(data.children || []);
               setSchoolsInfo(data.schools || []);
               setParentName(prev => data.parent?.parent_name || prev);
